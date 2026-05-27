@@ -1,0 +1,30 @@
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# Generated data and outputs
+data/raw/
+.kaggle/
+.tmp_*
+data/mock_problem_b/
+few_shot_visualizations/
+grad_cam_visualizations/
+diagnostic_reports/
+*.png
+*.jpg
+*.jpeg
+*.bmp
+*.h5
+*.pth
+*.pt
+*.ckpt
+*.log
+
+# IDE
+.idea/
+.vscode/
