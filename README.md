@@ -1,6 +1,6 @@
 # Agricultural Disease Diagnosis Project
 
-将数学建模论文代码整理为可复现、可演示、可扩展的个人项目。
+将数学建模论文代码整理为可复现、可演示、可扩展的个人项目。当前版本已经完成训练、评估、可解释分析和图片上传演示界面，并已推送到 GitHub。
 
 ## 项目内容
 
@@ -9,6 +9,7 @@
 - `q2.py`: 少样本学习与可视化
 - `q3.py`: 严重程度三分类与 Grad-CAM 可视化
 - `q4.py`: 多任务诊断与风险评估
+- `app.py`: 图片上传评估界面，本地即可演示
 - `scripts/generate_mock_dataset.py`: 在原始赛题数据丢失时，生成可运行的模拟测试数据集
 
 ## 目录说明
@@ -45,6 +46,16 @@ python scripts/generate_mock_dataset.py --output-dir data/mock_problem_b --num-c
 ```powershell
 python q1new.py --data-dir data/mock_problem_b --sample-ratio 1.0 --epochs 5 --patience 2
 ```
+
+### 4.1 训练主模型（PlantVillage，推荐用于最终展示）
+
+如果你已经准备好 PlantVillage 数据并切分到本地目录，可以直接训练：
+
+```powershell
+python q1new.py --dataset-mode plantvillage --data-dir C:\Users\ASUS\Desktop\新建文件夹\data\plantvillage --sample-ratio 1.0 --epochs 15 --patience 5
+```
+
+当前项目在 Windows 下已经验证可跑通，训练时建议把数据放在本机 C 盘或本地 SSD，避免外接盘掉盘导致中断。
 
 ### 5. 训练主模型（PlantVillage）
 
@@ -90,6 +101,13 @@ python scripts/test_inference.py --data-dir data/plantvillage/val
 python scripts/test_inference.py --image <你的图片路径>
 ```
 
+## 交付状态
+
+- 训练流程已验证可运行，包括多任务训练、单任务对比、诊断报告、Grad-CAM 和风险评估。
+- 图片上传评估界面已可本地演示。
+- 代码已推送到 GitHub，可直接作为个人项目展示。
+- 当前保留的主要非阻塞项是部分图表字体警告和 seaborn 版本兼容提示，不影响结果生成。
+
 ## 推荐展示方式
 
 如果你把它当作个人项目展示，建议在 README 里继续补充以下内容：
@@ -105,5 +123,5 @@ python scripts/test_inference.py --image <你的图片路径>
 
 - 已支持生成模拟数据集
 - 已支持自定义数据目录
-- 可作为个人项目的发布版基础
 - 已提供 TensorBoard 报告和图片上传评估界面
+- 已完成可运行的发布版整理并推送到 GitHub

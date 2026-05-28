@@ -2,52 +2,38 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
+import argparse
+import glob
+import os
+from datetime import datetime
+
+import cv2
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as font_manager
+import numpy as np
+import seaborn as sns
+from sklearn.metrics import accuracy_score, f1_score
+from tqdm import tqdm
 import torchvision.transforms as transforms
 from torchvision.models import MobileNet_V2_Weights
 from torchvision.datasets import ImageFolder
 from PIL import Image
-import numpy as np
-from sklearn.metrics import f1_score, accuracy_score, classification_report
-import matplotlib.pyplot as plt
-import seaborn as sns
-import os
-import glob
-import re
-import argparse
-from datetime import datetime
-import cv2
-from tqdm import tqdm
-
-# ========== 1. 病害详细信息映射（贴合附件文档标签体系） ==========
-DISEASE_DETAILS = {
-    0: {"name": "苹果健康", "description": "苹果叶片无明显病害症状，生长状态良好",
-        "suggestion": "保持现有种植管理措施，定期监测"},
-    1: {"name": "苹果斑点落叶病", "description": "叶片出现圆形或不规则褐色斑点，边缘清晰，后期斑点扩大并穿孔",
-        "suggestion": "及时清除病叶，喷施多菌灵或甲基托布津"},
-    2: {"name": "苹果褐斑病", "description": "叶片呈现暗褐色不规则病斑，表面产生黑色小点，严重时叶片脱落",
-        "suggestion": "加强通风透光，喷施苯醚甲环唑或戊唑醇"},
-    6: {"name": "樱桃健康", "description": "樱桃叶片无病害症状，光合作用正常",
-        "suggestion": "常规水肥管理，注意蚜虫防治"},
-    7: {"name": "樱桃穿孔病", "description": "叶片出现圆形或不规则褐色病斑，后期病斑脱落形成穿孔",
-        "suggestion": "喷施波尔多液或噻唑锌"},
-    8: {"name": "樱桃褐斑病", "description": "叶片呈现褐色圆形病斑，中心颜色较浅，边缘深色",
-        "suggestion": "加强排水，喷施嘧菌酯或肟菌酯"},
-    9: {"name": "玉米健康", "description": "玉米叶片无病害症状，光合作用正常",
-        "suggestion": "常规水肥管理，注意地下害虫防治"},
-    10: {"name": "玉米大斑病", "description": "叶片出现梭形黄褐色大斑，病斑沿叶脉扩展",
-         "suggestion": "轮作倒茬，喷施丙环唑或嘧菌酯"},
-    11: {"name": "玉米小斑病", "description": "叶片出现椭圆形黄褐色小斑，病斑密集",
-         "suggestion": "选用抗病品种，喷施苯醚甲环唑或吡唑醚菌酯"},
-    17: {"name": "葡萄健康", "description": "葡萄叶片无病害症状，光合作用正常",
-         "suggestion": "常规水肥管理，注意霜霉病预防"},
-    18: {"name": "葡萄黑腐病", "description": "叶片出现圆形褐色病斑，中心灰白色，边缘黑色",
-         "suggestion": "清除病残体，喷施代森锰锌或甲基硫菌灵"},
-    19: {"name": "葡萄褐斑病", "description": "叶片出现不规则褐色病斑，严重时叶片干枯",
-         "suggestion": "加强通风，喷施戊唑醇或氟硅唑"},
-}
 
 
-# ========== 2. 文件查找与解析函数（适配附件数据结构） ==========
+def configure_chinese_font():
+    available_fonts = {font.name for font in font_manager.fontManager.ttflist}
+    preferred_fonts = ["Microsoft YaHei", "SimHei", "Noto Sans CJK SC", "Arial Unicode MS"]
+    chosen_font = next((font_name for font_name in preferred_fonts if font_name in available_fonts), None)
+
+    if chosen_font:
+        plt.rcParams["font.sans-serif"] = [chosen_font]
+    else:
+        plt.rcParams["font.sans-serif"] = preferred_fonts
+    plt.rcParams["axes.unicode_minus"] = False
+
+
+configure_chinese_font()
+
 def find_data_files(base_dir=None):
     # 优先级: 显式参数 > 环境变量 > 项目内默认测试数据目录
     if base_dir is None:
@@ -750,7 +736,13 @@ def visualize_synergy(mt_metrics, st_disease_metrics, st_severity_metrics):
 def batch_generate_reports(model, dataloader, device, disease_mapping, max_reports=30):
     os.makedirs("diagnostic_reports", exist_ok=True)
     model.eval()
-    reverse_disease_mapping = {v: k for k, v in disease_mapping.items()}
+    # 兼容两种 disease_mapping 结构：
+    # - {name: idx} (MultiTaskDataset)
+    # - {idx: name} (PublicFolderDataset)
+    if all(isinstance(k, int) for k in disease_mapping.keys()):
+        idx_to_label = disease_mapping
+    else:
+        idx_to_label = {v: k for k, v in disease_mapping.items()}
     count = 0
 
     with torch.no_grad():
@@ -769,8 +761,11 @@ def batch_generate_reports(model, dataloader, device, disease_mapping, max_repor
                     break
                 image_path = dataloader.dataset.image_paths[batch_idx * dataloader.batch_size + i]
                 filename = filenames[i]
-                pred_disease_id = reverse_disease_mapping[disease_preds[i].item()]
-                pred_severity = severity_preds[i].item()
+                pred_idx = int(disease_preds[i].item())
+                # 先尝试用索引获取标签名/id，若不存在则回退为索引本身
+                pred_label = idx_to_label.get(pred_idx, pred_idx)
+                pred_disease_id = pred_label
+                pred_severity = int(severity_preds[i].item())
                 crop_type = get_crop_type(pred_disease_id)
 
                 # 关联附件文档的病害详情
@@ -842,47 +837,47 @@ def grad_cam_visualization(model, dataloader, device, num_samples=3, output_dir=
     feat_hook = target_layer.register_forward_hook(save_features)
 
     sample_count = 0
-    with torch.no_grad():
-        for images, _, _, filenames in dataloader:
+    for images, _, _, filenames in dataloader:
+        if sample_count >= num_samples:
+            break
+        images = images.to(device)
+        for i in range(len(images)):
             if sample_count >= num_samples:
                 break
-            images = images.to(device)
-            for i in range(len(images)):
-                if sample_count >= num_samples:
-                    break
-                img_tensor = images[i:i + 1].requires_grad_(True)
-                img_path = dataloader.dataset.image_paths[sample_count]
+            img_tensor = images[i:i + 1].requires_grad_(True)
+            img_path = dataloader.dataset.image_paths[sample_count]
 
-                # 1. 前向传播获取疾病分类输出
+            # 1. 前向传播获取疾病分类输出
+            with torch.enable_grad():
                 disease_output, _, _ = model(img_tensor)
 
-                # 2. 反向传播（针对预测的疾病类别）
-                pred_class = disease_output.argmax(dim=1).item()
-                model.zero_grad()
-                disease_output[:, pred_class].backward()
+            # 2. 反向传播（针对预测的疾病类别）
+            pred_class = disease_output.argmax(dim=1).item()
+            model.zero_grad()
+            disease_output[:, pred_class].backward()
 
-                # 3. 计算Grad-CAM热力图
-                weights = torch.mean(gradients, dim=[2, 3], keepdim=True)
-                cam = torch.sum(weights * features, dim=1).squeeze()
-                cam = torch.relu(cam)
+            # 3. 计算Grad-CAM热力图
+            weights = torch.mean(gradients, dim=[2, 3], keepdim=True)
+            cam = torch.sum(weights * features, dim=1).squeeze()
+            cam = torch.relu(cam)
 
-                # 4. 归一化并上采样到原图尺寸
-                cam = cam.cpu().detach().numpy()
-                cam = cv2.resize(cam, (128, 128))
-                cam = (cam - cam.min()) / (cam.max() - cam.min() + 1e-8)
+            # 4. 归一化并上采样到原图尺寸
+            cam = cam.cpu().detach().numpy()
+            cam = cv2.resize(cam, (128, 128))
+            cam = (cam - cam.min()) / (cam.max() - cam.min() + 1e-8)
 
-                # 5. 加载原始图像并叠加热力图
-                original_img = Image.open(img_path).convert('RGB').resize((128, 128))
-                img_np = np.array(original_img) / 255.0
-                cam_colored = cv2.applyColorMap(np.uint8(255 * cam), cv2.COLORMAP_JET)
-                cam_colored = cv2.cvtColor(cam_colored, cv2.COLOR_BGR2RGB) / 255.0
-                visualization = img_np * 0.6 + cam_colored * 0.4
+            # 5. 加载原始图像并叠加热力图
+            original_img = Image.open(img_path).convert('RGB').resize((128, 128))
+            img_np = np.array(original_img) / 255.0
+            cam_colored = cv2.applyColorMap(np.uint8(255 * cam), cv2.COLORMAP_JET)
+            cam_colored = cv2.cvtColor(cam_colored, cv2.COLOR_BGR2RGB) / 255.0
+            visualization = img_np * 0.6 + cam_colored * 0.4
 
-                # 6. 保存可视化结果
-                save_path = os.path.join(output_dir, f"grad_cam_{filenames[i]}")
-                plt.imsave(save_path, visualization)
-                print(f"✅ 保存Grad-CAM可视化结果: {save_path}")
-                sample_count += 1
+            # 6. 保存可视化结果
+            save_path = os.path.join(output_dir, f"grad_cam_{filenames[i]}")
+            plt.imsave(save_path, visualization)
+            print(f"✅ 保存Grad-CAM可视化结果: {save_path}")
+            sample_count += 1
 
     # 移除钩子
     grad_hook.remove()
@@ -935,12 +930,21 @@ def confidence_based_risk_assessment(model, dataloader, device, disease_mapping,
 
     # 可视化风险分布
     plt.figure(figsize=(8, 5))
-    sns.barplot(x=list(risk_stats.keys()), y=list(risk_stats.values()), palette="viridis")
+    risk_labels = list(risk_stats.keys())
+    risk_values = list(risk_stats.values())
+    sns.barplot(
+        x=risk_labels,
+        y=risk_values,
+        hue=risk_labels,
+        palette="viridis",
+        dodge=False,
+        legend=False,
+    )
     plt.title("作物病害风险等级分布（基于附件文档分级）")
     plt.xlabel("风险等级")
     plt.ylabel("样本数量")
     plt.xticks(rotation=30)
-    for i, v in enumerate(risk_stats.values()):
+    for i, v in enumerate(risk_values):
         plt.text(i, v + 0.5, str(v), ha='center')
     plt.tight_layout()
     plt.savefig("risk_distribution.png", dpi=300)

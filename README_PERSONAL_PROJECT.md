@@ -1,9 +1,9 @@
-# 农业病害诊断个人项目（可在无原赛题数据时运行）
+# 农业病害诊断个人项目（已整理为可演示版本）
 
 ## 1. 项目目标
 将数学建模论文代码改造成可复现、可演示、可迭代的个人项目。
 
-当前仓库已包含以下任务脚本：
+当前仓库已包含以下任务脚本，并已验证训练、推理和上传评估流程可运行：
 - q1.py: 问题一分类模型
 - q2.py: 少样本学习与可视化
 - q3.py: 严重程度三分类（TensorFlow）
@@ -37,6 +37,12 @@ python scripts/generate_mock_dataset.py --output-dir data/mock_problem_b --num-c
 python q1new.py --data-dir data/mock_problem_b --sample-ratio 1.0 --epochs 5 --patience 2
 ```
 
+如果使用 PlantVillage，请优先把数据放在本机 C 盘或本地 SSD，然后执行：
+
+```powershell
+python q1new.py --dataset-mode plantvillage --data-dir C:\Users\ASUS\Desktop\新建文件夹\data\plantvillage --sample-ratio 1.0 --epochs 15 --patience 5
+```
+
 ## 4. 输出结果位置
 运行 q1new.py 后，常见输出包括：
 - best_multitask_model.pth
@@ -50,7 +56,12 @@ python q1new.py --data-dir data/mock_problem_b --sample-ratio 1.0 --epochs 5 --p
 ## 5. 个人项目展示建议
 - README 中补充：任务背景、方法图、实验结果、失败案例分析。
 - 增加命令行参数说明和复现实验步骤。
-- 后续可加一个轻量 Web Demo（Gradio/Streamlit）作为展示入口。
+- 当前已提供图片上传评估界面，可直接作为展示入口。
 
 ## 6. 可选：替换为真实公开数据集
 如需更真实测试，可用 PlantVillage 等公开数据集。保持目录结构一致后即可复用当前训练流程。
+
+## 7. 当前完成度
+- 已完成训练、测试、诊断报告、Grad-CAM 和风险评估。
+- 已完成上传评估 UI。
+- 已推送到 GitHub，可直接用于展示和复现。
