@@ -24,6 +24,7 @@ diagnostic_reports/
 *.pt
 *.ckpt
 *.log
+upload_debug_*.bin
 
 # IDE
 .idea/

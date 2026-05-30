@@ -104,6 +104,16 @@ python q1new.py --dataset-mode plantvillage --data-dir data/plantvillage --sampl
 python app.py
 ```
 
+默认情况下，页面会监听 `0.0.0.0:7860`，同一局域网内的其他设备可以通过你这台电脑的局域网 IP 访问它。若只想本机访问，可以显式设置：
+
+```powershell
+$env:APP_HOST='127.0.0.1'
+$env:APP_PORT='7860'
+python app.py
+```
+
+如果你想把它真正放到公网给更多人使用，建议部署到 VPS、云服务器或带公网地址的平台，然后把 `APP_HOST` 保持为 `0.0.0.0`，再通过反向代理或平台提供的域名对外访问。
+
 如果你在 GPU conda 环境里运行，可以用：
 
 ```powershell
