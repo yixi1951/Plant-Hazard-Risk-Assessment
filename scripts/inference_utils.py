@@ -143,6 +143,7 @@ def predict_image(image, model_path="best_multitask_model.pth", device_name=None
     transform = build_transform()
     tensor = transform(image).unsqueeze(0).to(device)
 
+    # Deterministic prediction for annotated image and baseline summary
     with torch.no_grad():
         disease_logit, severity_logits, _ = model(tensor)
         disease_score = torch.sigmoid(disease_logit).item()
@@ -187,4 +188,63 @@ def predict_image(image, model_path="best_multitask_model.pth", device_name=None
         "severity": severity_name,
         "severity_confidence": round(float(severity_conf), 4),
     }
+    return annotated, summary, probability_map, meta
+
+
+def predict_with_uncertainty(image, mc_samples=16, model_path="best_multitask_model.pth", device_name=None):
+    """Run MC Dropout stochastic forward passes to estimate uncertainty.
+
+    Returns: annotated (PIL.Image), summary (str), probability_map (dict mean), meta (dict with stds and paths)
+    """
+    model, device = load_model(model_path=model_path, device_name=device_name)
+    transform = build_transform()
+    tensor = transform(image).unsqueeze(0).to(device)
+
+    # Enable dropout layers during inference for MC sampling
+    def enable_dropout(m):
+        if isinstance(m, nn.Dropout):
+            m.train()
+
+    model.eval()
+    for m in model.modules():
+        enable_dropout(m)
+
+    disease_scores = []
+    severity_probs_list = []
+    with torch.no_grad():
+        for i in range(mc_samples):
+            disease_logit, severity_logits, _ = model(tensor)
+            disease_score = torch.sigmoid(disease_logit).item()
+            severity_p = torch.softmax(severity_logits, dim=1)[0].detach().cpu().numpy()
+            disease_scores.append(disease_score)
+            severity_probs_list.append(severity_p)
+
+    import numpy as _np
+
+    disease_arr = _np.array(disease_scores)
+    severity_arr = _np.stack(severity_probs_list, axis=0)
+
+    disease_mean = float(disease_arr.mean())
+    disease_std = float(disease_arr.std())
+    severity_mean = severity_arr.mean(axis=0).tolist()
+    severity_std = severity_arr.std(axis=0).tolist()
+
+    # Reuse deterministic annotated image and summary for display
+    annotated, summary, probability_map, meta = predict_image(image, model_path=model_path, device_name=device_name)
+
+    # augment meta with uncertainty info
+    meta.update({
+        "disease_std": round(disease_std * 100.0, 4),
+        "severity_std": [round(float(x), 4) for x in severity_std],
+        "mc_samples": int(mc_samples),
+    })
+
+    # replace probability_map with mean values
+    probability_map = {k: round(float(v), 4) for k, v in zip(SEVERITY_LABELS, severity_mean)}
+
+    # append uncertainty info to summary
+    summary = summary + "\n\n不确定性估计: 疾病风险 std={:.2f}%，严重程度 std=[{:.3f}, {:.3f}, {:.3f}] ({} 次采样)".format(
+        disease_std * 100.0, severity_std[0], severity_std[1], severity_std[2], mc_samples
+    )
+
     return annotated, summary, probability_map, meta

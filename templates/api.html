@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}API文档 - 智农{% endblock %}
+{% block content %}
+<div class="panel section">
+  <div class="section-title">
+    <h2>API文档</h2>
+    <p>开放接口说明</p>
+  </div>
+  <p>本系统提供RESTful API，便于第三方平台集成病虫害识别能力。</p>
+  <ul class="guide-list">
+    <li><strong>POST /api/predict</strong>：上传图片，返回识别结果（JSON）</li>
+    <li><strong>参数</strong>：image（二进制文件），或 image_url（图片URL）</li>
+    <li><strong>返回</strong>：summary、probabilities、meta、annotated_image（base64）</li>
+    <li><strong>错误码</strong>：400参数错误，500服务异常</li>
+  </ul>
+  <div class="callout">如需API密钥或定制开发，请联系团队。</div>
+</div>
+{% endblock %}

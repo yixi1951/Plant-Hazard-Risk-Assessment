@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}智农 · 农作物病虫害AI智能识别预警系统{% endblock %}
+{% block content %}
+		<div class="hero-banner panel" style="margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;padding:20px 26px;">
+			<div style="display:flex;gap:18px;align-items:center;"> 
+				<div style="width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,#34d399,#10b981);display:grid;place-items:center;font-weight:900;color:#042014;">智农</div>
+				<div>
+					<div style="font-size:14px;color:var(--muted)">稻花香里说丰年 · 农作物病虫害AI智能识别预警系统</div>
+					<div style="font-size:20px;font-weight:800">拍照识别病虫害，一秒看到结果</div>
+				</div>
+			</div>
+			<div style="display:flex;gap:12px;align-items:center">
+				<button class="btn" onclick="document.getElementById('image_input').click();">上传图片</button>
+				<a href="#upload" class="btn secondary" style="text-decoration:none;color:inherit">开始识别</a>
+			</div>
+		</div>
+
+		<div class="hero" id="home">
+			<div class="panel hero-copy">
+				<div class="eyebrow">一句话介绍：拍照识别病虫害</div>
+				<h1>让农作物叶片自己说话</h1>
+				<p>农民伯伯只需要给庄稼叶子拍张照片，系统就能识别出农作物的病虫害种类，给出防治建议，并把结果整理成便于汇报的预警信息。这个页面保留了智农式的展示结构，同时兼顾本地上传、URL 预览和模型推理。</p>
+				<div class="hero-highlights">
+					<span class="chip">拍照、上传、一秒识别</span>
+					<span class="chip">有网就能用</span>
+					<span class="chip">支持 JPG / PNG / BMP</span>
+					<span class="chip">多任务联合学习</span>
+				</div>
+			</div>
+			<div class="panel hero-side">
+				<div class="side-card">
+					<div class="section-title" style="margin-bottom: 10px;">
+						<h2>如何使用“智农”</h2>
+						<p>有网就能用</p>
+					</div>
+					<ul class="guide-list">
+						<li>网页端直接上传图片，或者粘贴公开图片 URL。</li>
+						<li>先生成预览缩略图，确认内容无误后再开始评估。</li>
+						<li>查看识别结果、严重程度、风险评分和处理建议。</li>
+					</ul>
+				</div>
+				<div class="side-card">
+					<div class="section-title" style="margin-bottom: 12px;">
+						<h2>应用场景</h2>
+						<p>展示与汇报</p>
+					</div>
+					<div class="stat-grid">
+						<div class="stat"><strong>网页</strong><span>只要有网就能用</span></div>
+						<div class="stat"><strong>辅助</strong><span>专家与农户都能看</span></div>
+						<div class="stat"><strong>预警</strong><span>结果可用于整理报告</span></div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="panel section" style="padding: 0; overflow: hidden;">
+			<div style="display:grid; grid-template-columns: 1.05fr .95fr; min-height: 340px;">
+				<div style="padding: 28px; display:flex; flex-direction:column; justify-content:center; gap: 18px; background: linear-gradient(135deg, rgba(34,197,94,.10), rgba(255,255,255,0));">
+					<div class="eyebrow" style="width: fit-content;">项目官网式介绍区</div>
+					<h2 style="margin:0; font-size: clamp(28px, 3.4vw, 44px); line-height: 1.08;">把农业病害识别做成一页清晰、可演示、可汇报的产品页面</h2>
+					<p style="margin:0; color: var(--muted); line-height: 1.9; font-size: 16px; max-width: 60ch;">这个首页沿用 EasyFarming 那种“问题背景 - 使用方式 - 应用场景 - 黑科技 - 结果展示”的叙事节奏，但用你当前项目的模型和接口来落地。页面本身已经可以作为答辩、项目展示或课程汇报的首页。</p>
+					<div class="hero-highlights" style="margin-top: 0;">
+						<span class="chip">首页叙事</span>
+						<span class="chip">项目介绍</span>
+						<span class="chip">识别入口</span>
+						<span class="chip">结果预警</span>
+					</div>
+				</div>
+				<div style="padding: 20px; display:grid; place-items:center; background:
+					radial-gradient(circle at 25% 20%, rgba(34,197,94,.16), transparent 18%),
+					radial-gradient(circle at 76% 26%, rgba(132,204,22,.16), transparent 18%),
+					linear-gradient(180deg, rgba(245,253,247,.95), rgba(232,247,236,.92));">
+					<div style="width: min(100%, 360px); border-radius: 30px; padding: 18px; border: 1px solid rgba(34,197,94,.16); background: rgba(255,255,255,.78); box-shadow: 0 24px 60px rgba(34, 197, 94, .14);">
+						<div style="border-radius: 24px; overflow: hidden; min-height: 260px; background: linear-gradient(160deg, #dcfce7, #bbf7d0 48%, #fef9c3);
+							display:grid; place-items:center; position:relative;">
+							<div style="position:absolute; inset: 18px; border: 2px dashed rgba(21,128,61,.28); border-radius: 20px;"></div>
+							<div style="text-align:center; color:#14532d; padding: 20px; max-width: 240px;">
+								<div style="font-size: 44px; line-height: 1; margin-bottom: 10px;">🌱</div>
+								<div style="font-size: 18px; font-weight: 800; margin-bottom: 8px;">农田数据看板</div>
+								<div style="font-size: 13px; line-height: 1.7; color:#4b6a57;">绿色系主视觉，突出农业、预警、识别和汇报感。</div>
+							</div>
+						</div>
+						<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px;">
+							<div class="stat"><strong>识别</strong><span>病虫害种类</span></div>
+							<div class="stat"><strong>预警</strong><span>风险评分</span></div>
+							<div class="stat"><strong>汇报</strong><span>结果图下载</span></div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="panel section" id="overview">
+			<div class="section-title">
+				<h2>项目速览</h2>
+				<p>把 EasyFarming 的展示结构放到这个页面里</p>
+			</div>
+			<div class="tutorial-grid">
+				<div class="tutorial-card">
+					<div class="step-num">1</div>
+					<h3>一句话介绍</h3>
+					<p>给庄稼叶子拍张照片，系统自动识别病虫害，并输出防治建议。</p>
+				</div>
+				<div class="tutorial-card">
+					<div class="step-num">2</div>
+					<h3>如何使用</h3>
+					<p>网页、App、微信小程序都可以扩展成统一入口，打开即用，用完即走。</p>
+				</div>
+				<div class="tutorial-card">
+					<div class="step-num">3</div>
+					<h3>应用场景</h3>
+					<p>拍照识别、作物病害早预警、农药化肥精准投放、宏观农业数据采集。</p>
+				</div>
+				<div class="tutorial-card">
+					<div class="step-num">4</div>
+					<h3>黑科技</h3>
+					<p>基于深度残差网络和多任务学习，把分类、严重程度和风险评估串成一个流程。</p>
+				</div>
+			</div>
+		</div>
+
+		<div class="panel section" id="upload">
+			<div class="section-title">
+				<h2>完整链路</h2>
+				<p>从图片到预警的四步流程</p>
+			</div>
+			<div class="flow-track">
+				<div class="flow-node">
+					<div class="flow-kicker">Step 01</div>
+					<h3>拍照或上传</h3>
+					<p>选择本地图片，或者输入公开图片 URL 作为识别入口。</p>
+				</div>
+				<div class="flow-node">
+					<div class="flow-kicker">Step 02</div>
+					<h3>先做预览</h3>
+					<p>系统先生成缩略图，确认内容正确后再启动推理。</p>
+				</div>
+				<div class="flow-node">
+					<div class="flow-kicker">Step 03</div>
+					<h3>模型判断</h3>
+					<p>调用多任务模型，输出病害风险、严重程度与建议摘要。</p>
+				</div>
+				<div class="flow-node">
+					<div class="flow-kicker">Step 04</div>
+					<h3>生成报告</h3>
+					<p>保存结果图与 JSON 报告，方便汇报、展示和复查。</p>
+				</div>
+			</div>
+		</div>
+
+		<div class="panel section">
+			<div class="section-title">
+				<h2>上传与预览</h2>
+				<p>先确认图片，再进入模型识别</p>
+			</div>
+			<div class="upload-layout">
+				<div class="preview-pane">
+					<div class="preview-shell">
+						<h3>图片预览</h3>
+						<div class="preview-state" id="preview_status">等待上传或输入 URL</div>
+						<div class="image-view" id="preview_card" {% if not preview_b64 %}style="display:none;"{% endif %}>
+							<img id="preview_img" src="{% if preview_b64 %}data:image/png;base64,{{ preview_b64 }}{% endif %}" alt="预览图">
+						</div>
+						<div class="callout">提示：如果是本地图片，选择文件后会自动生成缩略图；如果是 URL，请先点“预览”，确认后再开始识别。</div>
+					</div>
+				</div>
+				<div class="form-pane">
+					<form method="post" enctype="multipart/form-data" id="upload_form">
+						<div class="upload-box">
+							<label class="field-label">1. 选择本地图片</label>
+							<input type="file" name="image" accept="image/*" id="image_input">
+							<label class="field-label">2. 或输入图片 URL</label>
+							<input type="url" name="image_url" id="image_url" placeholder="https://example.com/image.jpg">
+							<input type="hidden" name="preview_b64" id="preview_b64" value="{{ preview_b64 or '' }}">
+							<div class="actions">
+								<button class="btn secondary" type="submit" name="action" value="preview">预览</button>
+								<button class="btn" type="submit" name="action" value="predict" id="predict_btn" {% if not preview_b64 %}disabled{% endif %}>开始识别</button>
+								<span class="hint">评估按钮会在预览成功后自动解锁，避免直接处理未确认文件。</span>
+							</div>
+							<div id="upload_progress" style="display:none;margin-top:10px;">
+								<progress id="upload_progress_bar" value="0" max="100" style="width:100%;"></progress>
+								<div id="upload_progress_text" style="font-size:12px;color:var(--muted);margin-top:6px;">上传进度：0%</div>
+							</div>
+							<div class="meta-line">提示：使用的后端模型为 <strong>best_multitask_model.pth</strong>，推理时会自动做 128×128 归一化预处理。</div>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+
+		{% if result %}
+		<div class="panel results" id="results">
+			<div class="section-title">
+				<h2>识别结果与预警建议</h2>
+				<p>模型反馈与概率分布</p>
+			</div>
+			<div class="result-actions">
+				<button class="btn secondary" id="copy_summary_btn" onclick="copySummary();">复制摘要</button>
+				<button class="btn secondary" id="share_btn" onclick="shareResult();">分享结果</button>
+				<button class="btn secondary" id="download_json_btn" onclick="downloadReport();">下载报告</button>
+				<button class="btn secondary" id="qr_btn" onclick="generateQR();">生成二维码</button>
+				<button class="btn" id="download_img_btn" onclick="downloadAnnotated();">下载结果图</button>
+			</div>
+			<div id="qr_container" style="margin-top:10px;display:none"></div>
+			<div class="result-grid">
+				<div class="result-card">
+					<h2>模型反馈图</h2>
+					<div class="image-view">
+						<img src="data:image/png;base64,{{ result.annotated_image }}" alt="评估结果图">
+					</div>
+				</div>
+				<div class="result-card">
+					<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;">
+						<div style="flex:0 0 180px;text-align:center;">
+							<div class="meter" id="disease_meter" data-percent="{{ '%.0f'|format(result.meta.disease_risk_percent) }}">
+								<div class="meter-fill">
+									<div class="meter-center">
+										<div class="big">{{ '%.0f'|format(result.meta.disease_risk_percent) }}%</div>
+										<div class="small">病害风险评分</div>
+									</div>
+								</div>
+							</div>
+							<div class="result-highlight">严重程度：<strong style="margin-left:8px;color:#fff">{{ result.meta.severity }}</strong></div>
+						</div>
+						<div style="flex:1 1 360px;">
+							<h2>评估摘要</h2>
+							<div class="summary">{{ result.summary }}</div>
+							<h2 style="margin-top: 18px;">严重程度概率</h2>
+							<div class="probs">
+								{% for name, value in result.probabilities.items() %}
+								<div class="prob">
+									<span>{{ name }}</span>
+									<strong>{{ '%.1f%%'|format(value * 100) }}</strong>
+								</div>
+								<div class="progress-bar"><span style="width: {{ '%.0f'|format(value * 100) }}%;"></span></div>
+								{% endfor %}
+							</div>
+							<h2 style="margin-top: 18px;">运行信息</h2>
+							<div class="meta-line">
+								设备：{{ result.meta.device }}<br>
+								置信度：{{ '%.2f'|format(result.meta.severity_confidence * 100) }}%<br>
+								模型权重：<code>best_multitask_model.pth</code>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		{% endif %}
+
+		{% if error %}
+		<div class="error">{{ error }}</div>
+		{% endif %}
+
+		<div class="footer">由 智农 提供技术支持 · <a href="/about">了解更多</a></div>
+{% endblock %}

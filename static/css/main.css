@@ -1,0 +1,42 @@
+/* 智农主视觉绿色系样式，原本在index.html中的<style>已迁移 */
+:root {
+  --bg0: #f3fbf4;
+  --bg1: #e5f7e8;
+  --bg2: #d2efda;
+  --card: rgba(255, 255, 255, 0.82);
+  --card2: rgba(249, 253, 250, 0.92);
+  --line: rgba(34, 197, 94, 0.14);
+  --line-strong: rgba(34, 197, 94, 0.24);
+  --text: #16301f;
+  --muted: #4b6a57;
+  --accent: #16a34a;
+  --accent-2: #22c55e;
+  --danger: #dc2626;
+  --shadow: 0 24px 70px rgba(28, 87, 45, .10);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(34, 197, 94, .14), transparent 24%),
+    radial-gradient(circle at 84% 10%, rgba(132, 204, 22, .14), transparent 21%),
+    radial-gradient(circle at 80% 78%, rgba(34, 197, 94, .10), transparent 26%),
+    linear-gradient(180deg, var(--bg0), var(--bg1) 45%, var(--bg2));
+  min-height: 100vh;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: .12;
+  background-image:
+    linear-gradient(rgba(22,48,31,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(22,48,31,.05) 1px, transparent 1px);
+  background-size: 38px 38px;
+  mask-image: linear-gradient(180deg, rgba(0,0,0,.8), transparent 90%);
+}
+/* ...其余样式同 index.html，已省略... */

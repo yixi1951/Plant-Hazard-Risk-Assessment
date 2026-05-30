@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}智农 · 农作物病虫害AI智能识别预警系统{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-mark">智农</div>
+        <div class="brand-copy">
+          <strong>农作物病虫害AI智能识别预警系统</strong>
+          <span>拍照识别病虫害，有网就能用</span>
+        </div>
+      </div>
+      <div class="nav-links">
+        <a href="/">首页</a>
+        <a href="/about">关于项目</a>
+        <a href="/team">团队介绍</a>
+        <a href="/faq">常见问题</a>
+        <a href="/api">API文档</a>
+      </div>
+    </div>
+    {% block content %}{% endblock %}
+  </div>
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
