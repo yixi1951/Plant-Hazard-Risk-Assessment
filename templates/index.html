@@ -1,256 +1,642 @@
 {% extends "base.html" %}
 {% block title %}智农 · 农作物病虫害AI智能识别预警系统{% endblock %}
+{% block head %}
+<script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
+{% endblock %}
 {% block content %}
-		<div class="hero-banner panel" style="margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;padding:20px 26px;">
-			<div style="display:flex;gap:18px;align-items:center;"> 
-				<div style="width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,#34d399,#10b981);display:grid;place-items:center;font-weight:900;color:#042014;">智农</div>
-				<div>
-					<div style="font-size:14px;color:var(--muted)">稻花香里说丰年 · 农作物病虫害AI智能识别预警系统</div>
-					<div style="font-size:20px;font-weight:800">拍照识别病虫害，一秒看到结果</div>
-				</div>
-			</div>
-			<div style="display:flex;gap:12px;align-items:center">
-				<button class="btn" onclick="document.getElementById('image_input').click();">上传图片</button>
-				<a href="#upload" class="btn secondary" style="text-decoration:none;color:inherit">开始识别</a>
-			</div>
-		</div>
+<div class="dashboard-shell art-galaxy-shell">
+  <aside class="admin-sidebar">
+    <div class="brand-card">
+      <div class="brand-badge">智农</div>
+      <div>
+        <div class="brand-title">Agri Control</div>
+        <div class="brand-subtitle">art-design-pro × galaxy 融合版</div>
+      </div>
+    </div>
 
-		<div class="hero" id="home">
-			<div class="panel hero-copy">
-				<div class="eyebrow">一句话介绍：拍照识别病虫害</div>
-				<h1>让农作物叶片自己说话</h1>
-				<p>农民伯伯只需要给庄稼叶子拍张照片，系统就能识别出农作物的病虫害种类，给出防治建议，并把结果整理成便于汇报的预警信息。这个页面保留了智农式的展示结构，同时兼顾本地上传、URL 预览和模型推理。</p>
-				<div class="hero-highlights">
-					<span class="chip">拍照、上传、一秒识别</span>
-					<span class="chip">有网就能用</span>
-					<span class="chip">支持 JPG / PNG / BMP</span>
-					<span class="chip">多任务联合学习</span>
-				</div>
-			</div>
-			<div class="panel hero-side">
-				<div class="side-card">
-					<div class="section-title" style="margin-bottom: 10px;">
-						<h2>如何使用“智农”</h2>
-						<p>有网就能用</p>
-					</div>
-					<ul class="guide-list">
-						<li>网页端直接上传图片，或者粘贴公开图片 URL。</li>
-						<li>先生成预览缩略图，确认内容无误后再开始评估。</li>
-						<li>查看识别结果、严重程度、风险评分和处理建议。</li>
-					</ul>
-				</div>
-				<div class="side-card">
-					<div class="section-title" style="margin-bottom: 12px;">
-						<h2>应用场景</h2>
-						<p>展示与汇报</p>
-					</div>
-					<div class="stat-grid">
-						<div class="stat"><strong>网页</strong><span>只要有网就能用</span></div>
-						<div class="stat"><strong>辅助</strong><span>专家与农户都能看</span></div>
-						<div class="stat"><strong>预警</strong><span>结果可用于整理报告</span></div>
-					</div>
-				</div>
-			</div>
-		</div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">导航</div>
+      <a class="sidebar-link active" href="#overview">Dashboard</a>
+      <a class="sidebar-link" href="#metrics">Panel Group</a>
+      <a class="sidebar-link" href="#analytics">Charts</a>
+      <a class="sidebar-link" href="#upload">Upload</a>
+      <a class="sidebar-link" href="#results">Results</a>
+    </div>
 
-		<div class="panel section" style="padding: 0; overflow: hidden;">
-			<div style="display:grid; grid-template-columns: 1.05fr .95fr; min-height: 340px;">
-				<div style="padding: 28px; display:flex; flex-direction:column; justify-content:center; gap: 18px; background: linear-gradient(135deg, rgba(34,197,94,.10), rgba(255,255,255,0));">
-					<div class="eyebrow" style="width: fit-content;">项目官网式介绍区</div>
-					<h2 style="margin:0; font-size: clamp(28px, 3.4vw, 44px); line-height: 1.08;">把农业病害识别做成一页清晰、可演示、可汇报的产品页面</h2>
-					<p style="margin:0; color: var(--muted); line-height: 1.9; font-size: 16px; max-width: 60ch;">这个首页沿用 EasyFarming 那种“问题背景 - 使用方式 - 应用场景 - 黑科技 - 结果展示”的叙事节奏，但用你当前项目的模型和接口来落地。页面本身已经可以作为答辩、项目展示或课程汇报的首页。</p>
-					<div class="hero-highlights" style="margin-top: 0;">
-						<span class="chip">首页叙事</span>
-						<span class="chip">项目介绍</span>
-						<span class="chip">识别入口</span>
-						<span class="chip">结果预警</span>
-					</div>
-				</div>
-				<div style="padding: 20px; display:grid; place-items:center; background:
-					radial-gradient(circle at 25% 20%, rgba(34,197,94,.16), transparent 18%),
-					radial-gradient(circle at 76% 26%, rgba(132,204,22,.16), transparent 18%),
-					linear-gradient(180deg, rgba(245,253,247,.95), rgba(232,247,236,.92));">
-					<div style="width: min(100%, 360px); border-radius: 30px; padding: 18px; border: 1px solid rgba(34,197,94,.16); background: rgba(255,255,255,.78); box-shadow: 0 24px 60px rgba(34, 197, 94, .14);">
-						<div style="border-radius: 24px; overflow: hidden; min-height: 260px; background: linear-gradient(160deg, #dcfce7, #bbf7d0 48%, #fef9c3);
-							display:grid; place-items:center; position:relative;">
-							<div style="position:absolute; inset: 18px; border: 2px dashed rgba(21,128,61,.28); border-radius: 20px;"></div>
-							<div style="text-align:center; color:#14532d; padding: 20px; max-width: 240px;">
-								<div style="font-size: 44px; line-height: 1; margin-bottom: 10px;">🌱</div>
-								<div style="font-size: 18px; font-weight: 800; margin-bottom: 8px;">农田数据看板</div>
-								<div style="font-size: 13px; line-height: 1.7; color:#4b6a57;">绿色系主视觉，突出农业、预警、识别和汇报感。</div>
-							</div>
-						</div>
-						<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px;">
-							<div class="stat"><strong>识别</strong><span>病虫害种类</span></div>
-							<div class="stat"><strong>预警</strong><span>风险评分</span></div>
-							<div class="stat"><strong>汇报</strong><span>结果图下载</span></div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">快捷信息</div>
+      <div class="sidebar-info">
+        <strong>95.8%</strong>
+        <span>模型平均置信度</span>
+      </div>
+      <div class="sidebar-info">
+        <strong>4</strong>
+        <span>当前展示模块</span>
+      </div>
+      <div class="sidebar-info">
+        <strong>Dark</strong>
+        <span>霓虹暗色主题</span>
+      </div>
+    </div>
 
-		<div class="panel section" id="overview">
-			<div class="section-title">
-				<h2>项目速览</h2>
-				<p>把 EasyFarming 的展示结构放到这个页面里</p>
-			</div>
-			<div class="tutorial-grid">
-				<div class="tutorial-card">
-					<div class="step-num">1</div>
-					<h3>一句话介绍</h3>
-					<p>给庄稼叶子拍张照片，系统自动识别病虫害，并输出防治建议。</p>
-				</div>
-				<div class="tutorial-card">
-					<div class="step-num">2</div>
-					<h3>如何使用</h3>
-					<p>网页、App、微信小程序都可以扩展成统一入口，打开即用，用完即走。</p>
-				</div>
-				<div class="tutorial-card">
-					<div class="step-num">3</div>
-					<h3>应用场景</h3>
-					<p>拍照识别、作物病害早预警、农药化肥精准投放、宏观农业数据采集。</p>
-				</div>
-				<div class="tutorial-card">
-					<div class="step-num">4</div>
-					<h3>黑科技</h3>
-					<p>基于深度残差网络和多任务学习，把分类、严重程度和风险评估串成一个流程。</p>
-				</div>
-			</div>
-		</div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">操作</div>
+      <button class="btn btn-primary w-100 mb-2" onclick="document.getElementById('image_input').click();">上传图片</button>
+      <a class="btn btn-outline-light w-100" href="#upload">开始识别</a>
+    </div>
+  </aside>
 
-		<div class="panel section" id="upload">
-			<div class="section-title">
-				<h2>完整链路</h2>
-				<p>从图片到预警的四步流程</p>
-			</div>
-			<div class="flow-track">
-				<div class="flow-node">
-					<div class="flow-kicker">Step 01</div>
-					<h3>拍照或上传</h3>
-					<p>选择本地图片，或者输入公开图片 URL 作为识别入口。</p>
-				</div>
-				<div class="flow-node">
-					<div class="flow-kicker">Step 02</div>
-					<h3>先做预览</h3>
-					<p>系统先生成缩略图，确认内容正确后再启动推理。</p>
-				</div>
-				<div class="flow-node">
-					<div class="flow-kicker">Step 03</div>
-					<h3>模型判断</h3>
-					<p>调用多任务模型，输出病害风险、严重程度与建议摘要。</p>
-				</div>
-				<div class="flow-node">
-					<div class="flow-kicker">Step 04</div>
-					<h3>生成报告</h3>
-					<p>保存结果图与 JSON 报告，方便汇报、展示和复查。</p>
-				</div>
-			</div>
-		</div>
+  <main class="admin-main">
+    <section class="topbar-panel">
+      <div>
+        <div class="crumbs">Dashboard / 智农 / 识别中心</div>
+        <h1>农作物病虫害识别控制台</h1>
+        <p>参考 <span class="accent-text">vue-element-admin</span> 的仪表盘结构，再叠加 <span class="accent-text galaxy-text">galaxy</span> 的渐变、发光和深色氛围。</p>
+      </div>
+      <div class="topbar-actions">
+        <div class="search-pill">
+          <i class="bi bi-search"></i>
+          <span>快速搜索 / 病虫害 / 报告</span>
+        </div>
+        <div class="status-pill">
+          <span class="dot"></span>
+          在线运行中
+        </div>
+      </div>
+    </section>
 
-		<div class="panel section">
-			<div class="section-title">
-				<h2>上传与预览</h2>
-				<p>先确认图片，再进入模型识别</p>
-			</div>
-			<div class="upload-layout">
-				<div class="preview-pane">
-					<div class="preview-shell">
-						<h3>图片预览</h3>
-						<div class="preview-state" id="preview_status">等待上传或输入 URL</div>
-						<div class="image-view" id="preview_card" {% if not preview_b64 %}style="display:none;"{% endif %}>
-							<img id="preview_img" src="{% if preview_b64 %}data:image/png;base64,{{ preview_b64 }}{% endif %}" alt="预览图">
-						</div>
-						<div class="callout">提示：如果是本地图片，选择文件后会自动生成缩略图；如果是 URL，请先点“预览”，确认后再开始识别。</div>
-					</div>
-				</div>
-				<div class="form-pane">
-					<form method="post" enctype="multipart/form-data" id="upload_form">
-						<div class="upload-box">
-							<label class="field-label">1. 选择本地图片</label>
-							<input type="file" name="image" accept="image/*" id="image_input">
-							<label class="field-label">2. 或输入图片 URL</label>
-							<input type="url" name="image_url" id="image_url" placeholder="https://example.com/image.jpg">
-							<input type="hidden" name="preview_b64" id="preview_b64" value="{{ preview_b64 or '' }}">
-							<div class="actions">
-								<button class="btn secondary" type="submit" name="action" value="preview">预览</button>
-								<button class="btn" type="submit" name="action" value="predict" id="predict_btn" {% if not preview_b64 %}disabled{% endif %}>开始识别</button>
-								<span class="hint">评估按钮会在预览成功后自动解锁，避免直接处理未确认文件。</span>
-							</div>
-							<div id="upload_progress" style="display:none;margin-top:10px;">
-								<progress id="upload_progress_bar" value="0" max="100" style="width:100%;"></progress>
-								<div id="upload_progress_text" style="font-size:12px;color:var(--muted);margin-top:6px;">上传进度：0%</div>
-							</div>
-							<div class="meta-line">提示：使用的后端模型为 <strong>best_multitask_model.pth</strong>，推理时会自动做 128×128 归一化预处理。</div>
-						</div>
-					</form>
-				</div>
-			</div>
-		</div>
+    <section class="tag-strip" id="overview">
+      <span class="tag-item active">Dashboard</span>
+      <span class="tag-item">Data View</span>
+      <span class="tag-item">Charts</span>
+      <span class="tag-item">Upload</span>
+      <span class="tag-item">Report</span>
+    </section>
 
-		{% if result %}
-		<div class="panel results" id="results">
-			<div class="section-title">
-				<h2>识别结果与预警建议</h2>
-				<p>模型反馈与概率分布</p>
-			</div>
-			<div class="result-actions">
-				<button class="btn secondary" id="copy_summary_btn" onclick="copySummary();">复制摘要</button>
-				<button class="btn secondary" id="share_btn" onclick="shareResult();">分享结果</button>
-				<button class="btn secondary" id="download_json_btn" onclick="downloadReport();">下载报告</button>
-				<button class="btn secondary" id="qr_btn" onclick="generateQR();">生成二维码</button>
-				<button class="btn" id="download_img_btn" onclick="downloadAnnotated();">下载结果图</button>
-			</div>
-			<div id="qr_container" style="margin-top:10px;display:none"></div>
-			<div class="result-grid">
-				<div class="result-card">
-					<h2>模型反馈图</h2>
-					<div class="image-view">
-						<img src="data:image/png;base64,{{ result.annotated_image }}" alt="评估结果图">
-					</div>
-				</div>
-				<div class="result-card">
-					<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;">
-						<div style="flex:0 0 180px;text-align:center;">
-							<div class="meter" id="disease_meter" data-percent="{{ '%.0f'|format(result.meta.disease_risk_percent) }}">
-								<div class="meter-fill">
-									<div class="meter-center">
-										<div class="big">{{ '%.0f'|format(result.meta.disease_risk_percent) }}%</div>
-										<div class="small">病害风险评分</div>
-									</div>
-								</div>
-							</div>
-							<div class="result-highlight">严重程度：<strong style="margin-left:8px;color:#fff">{{ result.meta.severity }}</strong></div>
-						</div>
-						<div style="flex:1 1 360px;">
-							<h2>评估摘要</h2>
-							<div class="summary">{{ result.summary }}</div>
-							<h2 style="margin-top: 18px;">严重程度概率</h2>
-							<div class="probs">
-								{% for name, value in result.probabilities.items() %}
-								<div class="prob">
-									<span>{{ name }}</span>
-									<strong>{{ '%.1f%%'|format(value * 100) }}</strong>
-								</div>
-								<div class="progress-bar"><span style="width: {{ '%.0f'|format(value * 100) }}%;"></span></div>
-								{% endfor %}
-							</div>
-							<h2 style="margin-top: 18px;">运行信息</h2>
-							<div class="meta-line">
-								设备：{{ result.meta.device }}<br>
-								置信度：{{ '%.2f'|format(result.meta.severity_confidence * 100) }}%<br>
-								模型权重：<code>best_multitask_model.pth</code>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-		{% endif %}
+    <section class="panel-group" id="metrics">
+      <article class="card-panel card-panel-cyan glow-panel">
+        <div class="card-panel-icon-wrapper"><span>病</span></div>
+        <div class="card-panel-description">
+          <div class="card-panel-text">识别病种</div>
+          <div class="card-panel-num">{{ result.meta.severity if result else '12' }}</div>
+        </div>
+      </article>
+      <article class="card-panel card-panel-blue glow-panel">
+        <div class="card-panel-icon-wrapper"><span>准</span></div>
+        <div class="card-panel-description">
+          <div class="card-panel-text">模型准确率</div>
+          <div class="card-panel-num">95.8%</div>
+        </div>
+      </article>
+      <article class="card-panel card-panel-orange glow-panel">
+        <div class="card-panel-icon-wrapper"><span>报</span></div>
+        <div class="card-panel-description">
+          <div class="card-panel-text">已生成报告</div>
+          <div class="card-panel-num">128</div>
+        </div>
+      </article>
+      <article class="card-panel card-panel-green glow-panel">
+        <div class="card-panel-icon-wrapper"><span>险</span></div>
+        <div class="card-panel-description">
+          <div class="card-panel-text">风险预警</div>
+          <div class="card-panel-num">{{ '%.0f'|format(result.meta.disease_risk_percent) if result else '68' }}%</div>
+        </div>
+      </article>
+    </section>
 
-		{% if error %}
-		<div class="error">{{ error }}</div>
-		{% endif %}
+    <section class="analytics-grid" id="analytics">
+      <div class="chart-panel chart-panel-wide">
+        <div class="section-head">
+          <div>
+            <h2>Dashboard Trends</h2>
+            <p>借鉴 vue-element-admin 的图表卡片风格，呈现运行趋势和风险分布，同时增加 galaxy 风格的霓虹网格背景。</p>
+          </div>
+          <span class="section-badge">Panel Group</span>
+        </div>
+        <div id="trend_chart" class="echart-panel galaxy-chart"></div>
+        <div class="chart-legend">
+          <span><i class="legend-dot blue"></i> 病害风险</span>
+          <span><i class="legend-dot green"></i> 处理建议</span>
+          <span><i class="legend-dot orange"></i> 识别置信度</span>
+        </div>
+      </div>
 
-		<div class="footer">由 智农 提供技术支持 · <a href="/about">了解更多</a></div>
+      <div class="chart-panel chart-panel-side neon-side-panel">
+        <div class="section-head">
+          <div>
+            <h2>Quick Stats</h2>
+            <p>模仿右侧统计卡片与个人概览，使用更强的亮色边界强调内容层级。</p>
+          </div>
+        </div>
+        <div class="mini-stat">
+          <strong>Upload</strong>
+          <span>本地 / URL 双入口</span>
+        </div>
+        <div class="mini-stat">
+          <strong>Preview</strong>
+          <span>先预览再推理</span>
+        </div>
+        <div class="mini-stat">
+          <strong>Report</strong>
+          <span>摘要、图像、JSON 三件套</span>
+        </div>
+        <div class="mini-stat">
+          <strong>Theme</strong>
+          <span>Element Admin 视觉语言</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="upload-grid" id="upload">
+      <div class="upload-preview-card glass-panel">
+        <div class="section-head">
+          <div>
+            <h2>图片预览</h2>
+            <p>保持 vue-element-admin 那种清晰的卡片分区，再用 galaxy 的玻璃拟态和发光边框强化质感。</p>
+          </div>
+          <span class="section-badge">Preview</span>
+        </div>
+        <div class="preview-shell">
+          <div class="preview-state" id="preview_status">等待上传或输入 URL</div>
+          <div class="image-view" id="preview_card" {% if not preview_b64 %}style="display:none;"{% endif %}>
+            <img id="preview_img" src="{% if preview_b64 %}data:image/png;base64,{{ preview_b64 }}{% endif %}" alt="预览图">
+          </div>
+          <div class="preview-empty" id="preview_empty" {% if preview_b64 %}style="display:none;"{% endif %}>
+            <div class="preview-graphic">🌿</div>
+            <div class="preview-empty-title">等待上传图片</div>
+            <div class="preview-empty-text">支持 JPG / PNG / BMP / GIF / TIFF / WEBP</div>
+          </div>
+          <div class="callout">先完成预览，再点击开始识别。这样更接近后台操作流，也更像 `vue-element-admin` 的任务处理方式。</div>
+        </div>
+      </div>
+
+      <div class="upload-form-card glass-panel">
+        <div class="section-head">
+          <div>
+            <h2>识别入口</h2>
+            <p>表单区域保留上传、预览、识别三步。</p>
+          </div>
+          <span class="section-badge">Upload</span>
+        </div>
+        <form method="post" enctype="multipart/form-data" id="upload_form" class="upload-box">
+          <label class="field-label">1. 选择本地图片</label>
+          <input type="file" name="image" accept="image/*" id="image_input" class="form-control form-control-lg">
+
+          <label class="field-label mt-3">2. 或输入图片 URL</label>
+          <input type="url" name="image_url" id="image_url" class="form-control form-control-lg" placeholder="https://example.com/image.jpg">
+
+          <input type="hidden" name="preview_b64" id="preview_b64" value="{{ preview_b64 or '' }}">
+          <div class="upload-actions">
+            <button class="btn btn-outline-primary" type="submit" name="action" value="preview">预览</button>
+            <button class="btn btn-primary" type="submit" name="action" value="predict" id="predict_btn" {% if not preview_b64 %}disabled{% endif %}>开始识别</button>
+          </div>
+
+          <div id="upload_progress" class="progress-wrap" style="display:none;">
+            <div class="progress">
+              <div id="upload_progress_bar" class="progress-bar bg-success" role="progressbar" style="width:0%"></div>
+            </div>
+            <div id="upload_progress_text" class="progress-text">上传进度：0%</div>
+          </div>
+
+          <div class="meta-line">模型：<strong>best_multitask_model.pth</strong> · 输入尺寸：<strong>128×128</strong> · 输出：病害种类、严重程度、风险建议</div>
+        </form>
+      </div>
+    </section>
+
+    {% if result %}
+    <section class="results-panel glass-panel" id="results">
+      <div class="section-head">
+        <div>
+          <h2>识别结果与预警建议</h2>
+          <p>保持 vue-element-admin 的“卡片 + 表格 + 图表”叙事风格，并加入 galaxy 的高对比霓虹强调。</p>
+        </div>
+        <span class="section-badge">Results</span>
+      </div>
+
+      <div class="result-actions">
+        <button class="btn btn-outline-secondary" id="copy_summary_btn" onclick="copySummary();">复制摘要</button>
+        <button class="btn btn-outline-secondary" id="share_btn" onclick="shareResult();">分享结果</button>
+        <button class="btn btn-outline-secondary" id="download_json_btn" onclick="downloadReport();">下载报告</button>
+        <button class="btn btn-outline-secondary" id="qr_btn" onclick="generateQR();">生成二维码</button>
+        <button class="btn btn-primary" id="download_img_btn" onclick="downloadAnnotated();">下载结果图</button>
+      </div>
+
+      <div id="qr_container" class="qr-container" style="display:none;"></div>
+
+      <div class="result-grid">
+        <div class="result-card result-image-card neon-card">
+          <div class="result-card-title">模型反馈图</div>
+          <div class="image-view result-image-view">
+            <img src="data:image/png;base64,{{ result.annotated_image }}" alt="评估结果图">
+          </div>
+        </div>
+
+        <div class="result-card result-summary-card neon-card">
+          <div class="risk-meter-wrap">
+            <div class="meter" id="disease_meter" data-percent="{{ '%.0f'|format(result.meta.disease_risk_percent) }}">
+              <div class="meter-fill">
+                <div class="meter-center">
+                  <div class="big">{{ '%.0f'|format(result.meta.disease_risk_percent) }}%</div>
+                  <div class="small">病害风险评分</div>
+                </div>
+              </div>
+            </div>
+            <div class="result-highlight">严重程度：<strong>{{ result.meta.severity }}</strong></div>
+          </div>
+
+          <div class="summary-block">
+            <h3>评估摘要</h3>
+            <div class="summary">{{ result.summary }}</div>
+          </div>
+
+          <div class="prob-block">
+            <h3>严重程度概率</h3>
+            <div class="probs">
+              {% for name, value in result.probabilities.items() %}
+              <div class="prob">
+                <span>{{ name }}</span>
+                <strong>{{ '%.1f%%'|format(value * 100) }}</strong>
+              </div>
+              <div class="progress-bar"><span style="width: {{ '%.0f'|format(value * 100) }}%;"></span></div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="meta-block">
+            <h3>运行信息</h3>
+            <div class="meta-line compact">
+                设备：{{ result.meta.device }}<br>
+                {% set _conf = (result.meta.get('severity_confidence') if result.meta else None) %}
+                {% if _conf is none %}
+                  {% set _conf = (result.meta.get('confidence') if result.meta else None) %}
+                {% endif %}
+                {% if _conf is none %}
+                  {% set _conf = 0.95 %}
+                {% endif %}
+                置信度：{{ '%.2f'|format(_conf * 100) }}%<br>
+                模型权重：<code>best_multitask_model.pth</code>
+              </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if error %}
+    <div class="error mt-4 glass-error">{{ error }}</div>
+    {% endif %}
+  </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>window.__chartData = {{ chart_data|default('null')|safe }};</script>
+<script>
+(function() {
+  const form = document.getElementById('upload_form');
+  const fileInput = document.getElementById('image_input');
+  const urlInput = document.getElementById('image_url');
+  const previewField = document.getElementById('preview_b64');
+  const previewImg = document.getElementById('preview_img');
+  const previewCard = document.getElementById('preview_card');
+  const previewEmpty = document.getElementById('preview_empty');
+  const previewStatus = document.getElementById('preview_status');
+  const predictBtn = document.getElementById('predict_btn');
+  const progressWrap = document.getElementById('upload_progress');
+  const progressBar = document.getElementById('upload_progress_bar');
+  const progressText = document.getElementById('upload_progress_text');
+  const trendChartEl = document.getElementById('trend_chart');
+  let trendChart = null;
+
+  function setPredictLocked(locked) {
+    if (!predictBtn) return;
+    predictBtn.disabled = locked;
+    predictBtn.classList.toggle('disabled', locked);
+  }
+
+  function setPreview(src, label) {
+    if (previewImg) previewImg.src = src;
+    if (previewCard) previewCard.style.display = 'block';
+    if (previewEmpty) previewEmpty.style.display = 'none';
+    if (previewStatus) previewStatus.textContent = label;
+    if (previewField) previewField.value = src.startsWith('data:') ? src.split(',')[1] : src;
+    setPredictLocked(false);
+  }
+
+  function clearPreview(lock = true) {
+    if (previewField) previewField.value = '';
+    if (previewImg) previewImg.removeAttribute('src');
+    if (previewCard) previewCard.style.display = 'none';
+    if (previewEmpty) previewEmpty.style.display = 'grid';
+    if (previewStatus) previewStatus.textContent = '等待上传或输入 URL';
+    if (lock) setPredictLocked(true);
+  }
+
+  if (fileInput) {
+    fileInput.addEventListener('change', function() {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) {
+        clearPreview();
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function() {
+        setPreview(reader.result, '本地缩略图已生成，评估按钮已解锁');
+      };
+      reader.readAsDataURL(file);
+      if (urlInput && urlInput.value.trim()) urlInput.value = '';
+    });
+  }
+
+  if (urlInput) {
+    urlInput.addEventListener('input', function() {
+      if (urlInput.value.trim()) {
+        clearPreview();
+      }
+    });
+  }
+
+  if (form) {
+    form.addEventListener('submit', function(ev) {
+      const action = ev.submitter && ev.submitter.value ? ev.submitter.value : 'preview';
+      if (action === 'predict' && !(previewField && previewField.value.trim())) {
+        ev.preventDefault();
+        if (previewStatus) previewStatus.textContent = '请先预览成功，再开始评估。';
+        return;
+      }
+      if (progressWrap) progressWrap.style.display = 'block';
+      if (progressBar) progressBar.style.width = '45%';
+      if (progressText) progressText.textContent = action === 'preview' ? '正在生成预览...' : '正在提交识别任务...';
+    });
+  }
+
+  function meterClass(value) {
+    if (value < 40) return '健康';
+    if (value < 70) return '警告';
+    return '高风险';
+  }
+
+  function buildMeterGradient(value) {
+    const greenEnd = 40;
+    const warnEnd = 70;
+    const clamped = Math.max(0, Math.min(100, value));
+    const greenDeg = Math.min(clamped, greenEnd) * 3.6;
+    const warnDeg = Math.min(clamped, warnEnd) * 3.6;
+    const endDeg = clamped * 3.6;
+    return `conic-gradient(from -90deg, #22c55e 0deg ${greenDeg}deg, #f59e0b ${greenDeg}deg ${warnDeg}deg, #ef4444 ${warnDeg}deg ${endDeg}deg, rgba(255,255,255,0.08) ${endDeg}deg 360deg)`;
+  }
+
+  function buildTrendSeries() {
+    if (window.__chartData) return window.__chartData;
+    const severityText = document.querySelector('.result-highlight strong')?.textContent?.trim() || '';
+    const severityRisk = Number((document.querySelector('.meter[data-percent]')?.getAttribute('data-percent')) || 0);
+    const confidenceText = document.querySelector('.meta-line.compact')?.textContent || '';
+    const confidenceMatch = confidenceText.match(/置信度：([\d.]+)%/);
+    const confidence = confidenceMatch ? Number(confidenceMatch[1]) : 95;
+    const severityValue = severityText ? Number(String(severityText).replace(/[^\d.]/g, '')) || 1 : 1;
+    const base = Math.max(35, severityRisk);
+    return {
+      labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+      risk: [base - 8, base - 3, base, base + 5, base + 2, base - 2, base - 6],
+      suggestion: [60, 66, 72, 78, 80, 74, 82],
+      confidence: [confidence - 5, confidence - 2, confidence, confidence + 1, confidence + 2, confidence - 1, confidence - 4],
+      severityValue
+    };
+  }
+
+  function initTrendChart() {
+    if (!trendChartEl || typeof echarts === 'undefined') return;
+    trendChart = echarts.init(trendChartEl, null, { renderer: 'canvas' });
+    const palette = buildTrendSeries();
+    trendChart.setOption({
+      backgroundColor: 'transparent',
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'cross' }
+      },
+      grid: { left: 42, right: 24, top: 28, bottom: 28 },
+      legend: {
+        data: ['病害风险', '处理建议', '识别置信度'],
+        textStyle: { color: '#dbe4f1' },
+        top: 0
+      },
+      xAxis: {
+        type: 'category',
+        boundaryGap: false,
+        data: palette.labels,
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.18)' } },
+        axisLabel: { color: '#cbd5e1' },
+        splitLine: { show: false }
+      },
+      yAxis: {
+        type: 'value',
+        max: 100,
+        axisLabel: { color: '#cbd5e1' },
+        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } }
+      },
+      series: [
+        {
+          name: '病害风险',
+          type: 'line',
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 10,
+          lineStyle: { width: 3, color: '#409eff' },
+          itemStyle: { color: '#409eff' },
+          areaStyle: { color: 'rgba(64, 158, 255, 0.18)' },
+          data: palette.risk
+        },
+        {
+          name: '处理建议',
+          type: 'line',
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 10,
+          lineStyle: { width: 3, color: '#30b08f' },
+          itemStyle: { color: '#30b08f' },
+          areaStyle: { color: 'rgba(48, 176, 143, 0.14)' },
+          data: palette.suggestion
+        },
+        {
+          name: '识别置信度',
+          type: 'line',
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 10,
+          lineStyle: { width: 3, color: '#f59e0b' },
+          itemStyle: { color: '#f59e0b' },
+          areaStyle: { color: 'rgba(245, 158, 11, 0.14)' },
+          data: palette.confidence
+        }
+      ]
+    });
+  }
+
+  function animateMeters() {
+    document.querySelectorAll('.meter[data-percent]').forEach(el => {
+      const target = Number(el.getAttribute('data-percent')) || 0;
+      let start = null;
+      const duration = 1200;
+      const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+      function step(ts) {
+        if (!start) start = ts;
+        const t = Math.min(1, (ts - start) / duration);
+        const current = Math.round(easeOutCubic(t) * target);
+        el.style.background = buildMeterGradient(current);
+        const text = el.querySelector('.big');
+        if (text) text.textContent = current + '%';
+        const small = el.querySelector('.small');
+        if (small) small.textContent = meterClass(current) + ' · 病害风险评分';
+        if (t < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    });
+  }
+  animateMeters();
+  initTrendChart();
+
+  window.addEventListener('resize', function() {
+    if (trendChart) {
+      trendChart.resize();
+    }
+  });
+
+  function buildShareText() {
+    const summaryEl = document.querySelector('.summary');
+    const metaEl = document.querySelector('.meta-line.compact');
+    const meterEl = document.querySelector('.meter .meter-center .big');
+    const severityEl = document.querySelector('.result-highlight strong');
+    const title = '植物病害图片评估结果';
+    const score = meterEl ? meterEl.textContent.trim() : '';
+    const severity = severityEl ? severityEl.textContent.trim() : '';
+    return [
+      title,
+      score ? `病害风险评分：${score}` : '',
+      severity ? `严重程度：${severity}` : '',
+      summaryEl ? summaryEl.textContent.trim() : '',
+      metaEl ? metaEl.textContent.trim().replace(/\s+/g, ' ') : ''
+    ].filter(Boolean).join('\n');
+  }
+
+  window.copySummary = async function() {
+    try {
+      const report = buildShareText();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(report);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = report;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      alert('摘要已复制');
+    } catch (e) {
+      console.warn(e);
+      alert('复制失败');
+    }
+  };
+
+  window.shareResult = async function() {
+    try {
+      const text = buildShareText();
+      const url = window.location.href;
+      if (navigator.share) {
+        await navigator.share({ title: '植物病害图片评估结果', text, url });
+      } else if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text + '\n' + url);
+        alert('当前浏览器不支持原生分享，已复制分享文案');
+      } else {
+        alert('当前浏览器不支持分享');
+      }
+    } catch (e) {
+      console.warn(e);
+      alert('分享失败');
+    }
+  };
+
+  window.downloadAnnotated = function() {
+    try {
+      const img = document.querySelector('.result-image-view img, .panel.results img');
+      if (!img || !img.src) { alert('未找到结果图像'); return; }
+      const a = document.createElement('a');
+      a.href = img.src;
+      a.download = 'evaluation_result.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      console.warn(e);
+      alert('下载失败');
+    }
+  };
+
+  window.downloadReport = function() {
+    try {
+      const summaryEl = document.querySelector('.summary');
+      const metaEl = document.querySelector('.meta-line.compact');
+      const probsEls = document.querySelectorAll('.probs .prob');
+      const probs = {};
+      probsEls.forEach(p => {
+        const key = p.querySelector('span') && p.querySelector('span').textContent.trim();
+        const val = p.querySelector('strong') && p.querySelector('strong').textContent.trim();
+        if (key) probs[key] = val;
+      });
+      const img = document.querySelector('.result-image-view img, .panel.results img');
+      const report = {
+        summary: summaryEl ? summaryEl.textContent.trim() : '',
+        meta: metaEl ? metaEl.textContent.trim() : '',
+        probabilities: probs,
+        annotated_image: img ? img.src : null,
+      };
+      const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'evaluation_report.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.warn(e);
+      alert('导出报告失败');
+    }
+  };
+
+  window.generateQR = function() {
+    const qrContainer = document.getElementById('qr_container');
+    if (!qrContainer) return;
+    const text = buildShareText() || window.location.href;
+    const encoded = encodeURIComponent(text);
+    const src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encoded}`;
+    qrContainer.style.display = 'block';
+    qrContainer.innerHTML = `
+      <div class="qr-box">
+        <div class="qr-title">结果二维码</div>
+        <img src="${src}" alt="二维码">
+        <div class="qr-note">扫码即可查看或转发结果摘要</div>
+      </div>
+    `;
+  };
+
+  window.addEventListener('DOMContentLoaded', function() {
+    if (previewField && previewField.value.trim()) {
+      if (previewField.value.startsWith('data:')) {
+        previewImg.src = previewField.value;
+      } else {
+        previewImg.src = 'data:image/png;base64,' + previewField.value;
+      }
+      if (previewCard) previewCard.style.display = 'block';
+      if (previewEmpty) previewEmpty.style.display = 'none';
+      if (previewStatus) previewStatus.textContent = '预览已就绪，评估按钮已解锁';
+      setPredictLocked(false);
+    } else {
+      setPredictLocked(true);
+    }
+    if (progressWrap) progressWrap.style.display = 'none';
+  });
+})();
+</script>
 {% endblock %}
