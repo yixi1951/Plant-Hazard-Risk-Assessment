@@ -1,9 +1,14 @@
-{% extends "base.html" %}
-{% block title %}智农 · 农作物病虫害AI智能识别预警系统{% endblock %}
-{% block head %}
-<script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
-{% endblock %}
-{% block content %}
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>智农 · 农作物病虫害AI智能识别预警系统</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('favicon') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
+</head>
+<body>
 <div class="dashboard-shell art-galaxy-shell">
   <aside class="admin-sidebar">
     <div class="brand-card">
@@ -179,16 +184,31 @@
           <span class="section-badge">Upload</span>
         </div>
         <form method="post" enctype="multipart/form-data" id="upload_form" class="upload-box">
-          <label class="field-label">1. 选择本地图片</label>
-          <input type="file" name="image" accept="image/*" id="image_input" class="form-control form-control-lg">
+          <label class="field-label">1. 拖拽或选择本地图片</label>
+          <div class="drop-zone" id="drop_zone">
+            <div class="drop-zone-icon">📁</div>
+            <div class="drop-zone-text">拖拽图片到此处，或点击选择文件</div>
+            <div class="drop-zone-hint">支持 JPG / PNG / BMP，单张最大 10MB</div>
+            <input type="file" name="image" accept="image/*" id="image_input" class="drop-zone-input">
+          </div>
 
           <label class="field-label mt-3">2. 或输入图片 URL</label>
           <input type="url" name="image_url" id="image_url" class="form-control form-control-lg" placeholder="https://example.com/image.jpg">
+
+          <label class="field-label mt-3">3. 批量预测 (多张图片 / ZIP压缩包)</label>
+          <div class="drop-zone batch-zone" id="batch_drop_zone">
+            <div class="drop-zone-icon">🗂️</div>
+            <div class="drop-zone-text">拖拽多张图片或 ZIP 压缩包到此处</div>
+            <div class="drop-zone-hint">或 <a href="javascript:void(0)" id="batch_file_trigger">点击选择文件</a></div>
+            <input type="file" name="batch_files" accept="image/*,.zip" id="batch_file_input" class="drop-zone-input" multiple>
+          </div>
+          <div id="batch_file_list" class="batch-file-list" style="display:none;"></div>
 
           <input type="hidden" name="preview_b64" id="preview_b64" value="{{ preview_b64 or '' }}">
           <div class="upload-actions">
             <button class="btn btn-outline-primary" type="submit" name="action" value="preview">预览</button>
             <button class="btn btn-primary" type="submit" name="action" value="predict" id="predict_btn" {% if not preview_b64 %}disabled{% endif %}>开始识别</button>
+            <button class="btn btn-outline-info" type="button" id="batch_predict_btn" disabled>批量预测</button>
           </div>
 
           <div id="upload_progress" class="progress-wrap" style="display:none;">
@@ -197,6 +217,15 @@
             </div>
             <div id="upload_progress_text" class="progress-text">上传进度：0%</div>
           </div>
+
+          <div id="batch_progress_wrap" class="progress-wrap" style="display:none;">
+            <div class="progress">
+              <div id="batch_progress_bar" class="progress-bar bg-info" role="progressbar" style="width:0%"></div>
+            </div>
+            <div id="batch_progress_text" class="progress-text">批量处理中：0 / 0</div>
+          </div>
+
+          <div id="batch_results" class="batch-results" style="display:none;"></div>
 
           <div class="meta-line">模型：<strong>best_multitask_model.pth</strong> · 输入尺寸：<strong>128×128</strong> · 输出：病害种类、严重程度、风险建议</div>
         </form>
@@ -287,9 +316,6 @@
     {% endif %}
   </main>
 </div>
-{% endblock %}
-
-{% block scripts %}
 <script>window.__chartData = {{ chart_data|default('null')|safe }};</script>
 <script>
 (function() {
@@ -637,6 +663,168 @@
     }
     if (progressWrap) progressWrap.style.display = 'none';
   });
+
+  // ===== Drag & Drop — Single File =====
+  const dropZone = document.getElementById('drop_zone');
+  // fileInput 已在 IIFE 顶部声明
+  if (dropZone && fileInput) {
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        fileInput.files = files;
+        fileInput.dispatchEvent(new Event('change'));
+      }
+    });
+  }
+
+  // ===== Drag & Drop — Batch Files =====
+  const batchDropZone = document.getElementById('batch_drop_zone');
+  const batchFileInput = document.getElementById('batch_file_input');
+  const batchFileList = document.getElementById('batch_file_list');
+  const batchPredictBtn = document.getElementById('batch_predict_btn');
+  const batchProgressWrap = document.getElementById('batch_progress_wrap');
+  const batchProgressBar = document.getElementById('batch_progress_bar');
+  const batchProgressText = document.getElementById('batch_progress_text');
+  const batchResults = document.getElementById('batch_results');
+  let batchFiles = [];
+
+  if (batchDropZone && batchFileInput) {
+    document.getElementById('batch_file_trigger')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      batchFileInput.click();
+    });
+    batchDropZone.addEventListener('dragover', (e) => { e.preventDefault(); batchDropZone.classList.add('dragover'); });
+    batchDropZone.addEventListener('dragleave', () => batchDropZone.classList.remove('dragover'));
+    batchDropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      batchDropZone.classList.remove('dragover');
+      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/') || f.name.endsWith('.zip'));
+      if (files.length > 0) {
+        batchFileInput.files = null;
+        batchFiles = files;
+        updateBatchFileList();
+      }
+    });
+    batchFileInput.addEventListener('change', () => {
+      if (batchFileInput.files && batchFileInput.files.length > 0) {
+        batchFiles = Array.from(batchFileInput.files);
+        updateBatchFileList();
+      }
+    });
+  }
+
+  function updateBatchFileList() {
+    if (!batchFileList || !batchPredictBtn) return;
+    if (batchFiles.length === 0) {
+      batchFileList.style.display = 'none';
+      batchPredictBtn.disabled = true;
+      return;
+    }
+    batchFileList.style.display = 'block';
+    batchFileList.innerHTML = batchFiles.map(f =>
+      `<div class="file-item">${f.name} (${(f.size / 1024).toFixed(1)} KB)</div>`
+    ).join('');
+    batchPredictBtn.disabled = false;
+  }
+
+  if (batchPredictBtn) {
+    batchPredictBtn.addEventListener('click', async () => {
+      if (batchFiles.length === 0) return;
+      batchPredictBtn.disabled = true;
+      if (batchProgressWrap) batchProgressWrap.style.display = 'block';
+      if (batchResults) batchResults.style.display = 'block';
+      if (batchResults) batchResults.innerHTML = '<div class="batch-summary"><span class="bs-item"><span class="bs-num">⏳</span><span class="bs-label">处理中...</span></span></div>';
+
+      const total = batchFiles.length;
+      let completed = 0;
+      let resultsHtml = '';
+
+      for (let i = 0; i < total; i++) {
+        const file = batchFiles[i];
+        const formData = new FormData();
+        // Check if it's a zip file
+        if (file.name.endsWith('.zip')) {
+          formData.append('batch_zip', file);
+        } else {
+          formData.append('batch_images', file);
+        }
+        formData.append('index', i);
+
+        try {
+          const resp = await fetch('/batch_predict', { method: 'POST', body: formData });
+          const data = await resp.json();
+          completed++;
+          const pct = Math.round((completed / total) * 100);
+          if (batchProgressBar) batchProgressBar.style.width = pct + '%';
+          if (batchProgressText) batchProgressText.textContent = `批量处理中：${completed} / ${total}`;
+
+          if (data.error) {
+            resultsHtml += `
+              <div class="batch-result-card">
+                <div class="br-header">
+                  <span class="br-filename">${file.name}</span>
+                  <span class="br-status error">失败</span>
+                </div>
+                <div class="br-detail">${data.error}</div>
+              </div>`;
+          } else {
+            resultsHtml += `
+              <div class="batch-result-card">
+                <div class="br-header">
+                  <span class="br-filename">${file.name}</span>
+                  <span class="br-status success">成功</span>
+                </div>
+                <div class="br-detail">
+                  <strong>病害：</strong>${data.disease_name || '未知'}<br>
+                  <strong>严重程度：</strong>${data.severity || '未知'}<br>
+                  <strong>风险评分：</strong>${data.risk_score ?? '-'}<br>
+                  <strong>置信度：</strong>${data.confidence ? (data.confidence + '%') : '-'}
+                </div>
+              </div>`;
+          }
+          if (batchResults) {
+            batchResults.innerHTML = `
+              <div class="batch-summary">
+                <span class="bs-item"><span class="bs-num">${completed}</span><span class="bs-label">/ ${total} 完成</span></span>
+                <span class="bs-item"><span class="bs-num">${resultsHtml.split('成功').length - 1}</span><span class="bs-label">成功</span></span>
+                <span class="bs-item"><span class="bs-num">${resultsHtml.split('失败').length - 1}</span><span class="bs-label">失败</span></span>
+              </div>
+              ${resultsHtml}`;
+          }
+        } catch (err) {
+          console.error('Batch error:', err);
+          completed++;
+          resultsHtml += `
+            <div class="batch-result-card">
+              <div class="br-header">
+                <span class="br-filename">${file.name}</span>
+                <span class="br-status error">失败</span>
+              </div>
+              <div class="br-detail">请求失败: ${err.message}</div>
+            </div>`;
+        }
+      }
+
+      if (batchProgressWrap) batchProgressWrap.style.display = 'none';
+      batchPredictBtn.disabled = false;
+      if (batchResults) {
+        batchResults.innerHTML = `
+          <div class="batch-summary">
+            <span class="bs-item"><span class="bs-num">${completed}</span><span class="bs-label">/ ${total} 完成</span></span>
+            <span class="bs-item"><span class="bs-num">${resultsHtml.split('成功').length - 1}</span><span class="bs-label">成功</span></span>
+            <span class="bs-item"><span class="bs-num">${resultsHtml.split('失败').length - 1}</span><span class="bs-label">失败</span></span>
+          </div>
+          ${resultsHtml}`;
+        batchResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  }
 })();
 </script>
-{% endblock %}
+</body>
+</html>

@@ -5,10 +5,89 @@ import socket
 import ipaddress
 import logging
 import re
+import sys
 from urllib.parse import urlparse
 import os
+import glob
 
 from flask import Flask, render_template_string, render_template, request, jsonify
+app = Flask(__name__)
+
+# ── 临时文件自动清理 ──────────────────────────────────────────
+_TMP_DIR = os.path.join(os.getcwd(), 'tmp_uploads')
+_MAX_TMP_AGE_SECONDS = 3600  # 1 小时
+
+
+def _cleanup_tmp_uploads():
+    """启动时清理过期临时文件，避免 tmp_uploads/ 无限膨胀。"""
+    if not os.path.isdir(_TMP_DIR):
+        return
+    now = __import__('time').time()
+    removed = 0
+    for fname in os.listdir(_TMP_DIR):
+        fpath = os.path.join(_TMP_DIR, fname)
+        if os.path.isfile(fpath):
+            age = now - os.path.getmtime(fpath)
+            if age > _MAX_TMP_AGE_SECONDS:
+                try:
+                    os.remove(fpath)
+                    removed += 1
+                except Exception:
+                    pass
+    if removed:
+        print(f"[cleanup] 已清理 {removed} 个过期临时文件 ({_TMP_DIR})")
+
+
+_cleanup_tmp_uploads()
+
+from werkzeug.exceptions import RequestEntityTooLarge
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_request_entity_too_large(e):
+  max_mb = app.config.get('MAX_CONTENT_LENGTH', 0) // (1024 * 1024)
+  logger.warning(
+    'RequestEntityTooLarge on %s from %s content_length=%s max_mb=%s',
+    request.path,
+    request.remote_addr,
+    request.content_length,
+    max_mb,
+  )
+  err_msg = f"上传或评估失败：上传文件太大（最大支持 {max_mb} MB）。请压缩图片或使用图片 URL 上传。"
+  return render_template("index.html", error=err_msg), 413
+
+
+@app.before_request
+def log_request_before_request():
+  logger.info(
+    'Before request %s %s content_length=%s content_type=%s',
+    request.method,
+    request.path,
+    request.content_length,
+    request.content_type,
+  )
+
+
+@app.after_request
+def add_no_cache_headers(response):
+  if response.mimetype == 'text/html':
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+  return response
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_exception(e):
+  if isinstance(e, RequestEntityTooLarge):
+    return handle_request_entity_too_large(e)
+  logger.exception('Unhandled exception on %s from %s: %s', request.path, request.remote_addr, e)
+  return render_template("index.html", error=f"服务器内部错误：{e}"), 500
+
+@app.route('/favicon.ico')
+def favicon():
+  return send_from_directory('static', 'favicon.svg', mimetype='image/svg+xml')
+
 @app.route("/about")
 def about():
   return render_template("about.html")
@@ -24,21 +103,97 @@ def faq():
 @app.route("/api")
 def api_doc():
   return render_template("api.html")
+
 from PIL import Image
 
-from scripts.inference_utils import predict_image, predict_with_uncertainty
+from scripts.inference_utils import predict_image, predict_with_uncertainty, load_model
 import json
 from datetime import datetime
+
+# ── 启动模型校验 ──────────────────────────────────────────
+_MODEL_PATH = os.environ.get('MODEL_PATH', 'best_multitask_model.pth')
+if os.path.exists(_MODEL_PATH):
+    try:
+        _model, _device, _meta = load_model(model_path=_MODEL_PATH)
+        logging.getLogger(__name__).info(
+            '✅ 模型加载成功: %s (device=%s num_diseases=%s)',
+            _MODEL_PATH, _device,
+            _meta.get('num_diseases', '?'),
+        )
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            '⚠️ 模型加载失败: %s (%s: %s). 运行时预测将按需重试。',
+            _MODEL_PATH, type(exc).__name__, exc,
+        )
+else:
+    logging.getLogger(__name__).warning(
+        '⚠️ 模型文件不存在: %s. 请将模型权重放置于项目根目录，或设置环境变量 MODEL_PATH。',
+        _MODEL_PATH,
+    )
 from flask import send_from_directory, url_for
 from PIL import ImageDraw, ImageFont
 
 
-app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 MB limit for uploads
+# Max upload size (in bytes). Default 10 MB, can be overridden with env var MAX_UPLOAD_MB
+try:
+  _max_mb = int(os.environ.get('MAX_UPLOAD_MB', '10'))
+except Exception:
+  _max_mb = 10
+app.config['MAX_CONTENT_LENGTH'] = _max_mb * 1024 * 1024
 
 # logging
-logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
+logging.basicConfig(
+  level=logging.INFO,
+  format='[%(asctime)s] %(levelname)s: %(message)s',
+  stream=sys.stdout,
+  force=True,
+)
 logger = logging.getLogger('agri_app')
+logger.setLevel(logging.INFO)
+logging.getLogger('werkzeug').setLevel(logging.INFO)
+
+_file_handler = logging.FileHandler(os.path.join(os.getcwd(), 'server_debug.log'), encoding='utf-8')
+_file_handler.setLevel(logging.INFO)
+_file_handler.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s'))
+logger.addHandler(_file_handler)
+logging.getLogger().addHandler(_file_handler)
+
+
+class RequestLogMiddleware:
+  def __init__(self, app):
+    self.app = app
+
+  def __call__(self, environ, start_response):
+    method = environ.get('REQUEST_METHOD', '-')
+    path = environ.get('PATH_INFO', '-')
+    content_length = environ.get('CONTENT_LENGTH', '-')
+    remote_addr = environ.get('REMOTE_ADDR', '-')
+    logger.info('Incoming request %s %s from %s content_length=%s', method, path, remote_addr, content_length)
+    try:
+      max_length = int(app.config.get('MAX_CONTENT_LENGTH') or 0)
+      body_length = int(content_length) if content_length not in ('', '-', None) else 0
+      if max_length and body_length > max_length:
+        logger.warning(
+          'Rejected request in middleware %s %s from %s content_length=%s max_length=%s',
+          method,
+          path,
+          remote_addr,
+          body_length,
+          max_length,
+        )
+        response_body = b'413 Request Entity Too Large\n'
+        headers = [
+          ('Content-Type', 'text/plain; charset=utf-8'),
+          ('Content-Length', str(len(response_body))),
+        ]
+        start_response('413 REQUEST ENTITY TOO LARGE', headers)
+        return [response_body]
+    except Exception as exc:
+      logger.exception('Middleware size check failed for %s %s: %s', method, path, exc)
+    return self.app(environ, start_response)
+
+
+app.wsgi_app = RequestLogMiddleware(app.wsgi_app)
 
 # simple filename sanitization
 _FILENAME_BAD_RE = re.compile(r"\.(php|phtml|exe|sh|js|py)$", re.IGNORECASE)
@@ -113,833 +268,12 @@ def _host_resolves_to_private(hostname: str) -> bool:
   return False
 
 
-HTML = r"""
-<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>智农 · 农作物病虫害AI智能识别预警系统</title>
-  <style>
-    :root {
-      --bg0: #f3fbf4;
-      --bg1: #e5f7e8;
-      --bg2: #d2efda;
-      --card: rgba(255, 255, 255, 0.82);
-      --card2: rgba(249, 253, 250, 0.92);
-      --line: rgba(34, 197, 94, 0.14);
-      --line-strong: rgba(34, 197, 94, 0.24);
-      --text: #16301f;
-      --muted: #4b6a57;
-      --accent: #16a34a;
-      --accent-2: #22c55e;
-      --danger: #dc2626;
-      --shadow: 0 24px 70px rgba(28, 87, 45, .10);
-    }
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      margin: 0;
-      color: var(--text);
-      font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
-      background:
-        radial-gradient(circle at 12% 16%, rgba(34, 197, 94, .14), transparent 24%),
-        radial-gradient(circle at 84% 10%, rgba(132, 204, 22, .14), transparent 21%),
-        radial-gradient(circle at 80% 78%, rgba(34, 197, 94, .10), transparent 26%),
-        linear-gradient(180deg, var(--bg0), var(--bg1) 45%, var(--bg2));
-      min-height: 100vh;
-    }
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      opacity: .12;
-      background-image:
-        linear-gradient(rgba(22,48,31,.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(22,48,31,.05) 1px, transparent 1px);
-      background-size: 38px 38px;
-      mask-image: linear-gradient(180deg, rgba(0,0,0,.8), transparent 90%);
-    }
-    .wrap { max-width: 1320px; margin: 0 auto; padding: 28px 18px 56px; position: relative; }
-    .topbar {
-      position: sticky;
-      top: 12px;
-      z-index: 20;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 16px;
-      padding: 14px 18px;
-      margin-bottom: 18px;
-      border-radius: 20px;
-      border: 1px solid rgba(34, 197, 94, .14);
-      background: rgba(255, 255, 255, .72);
-      backdrop-filter: blur(18px);
-      box-shadow: var(--shadow);
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      min-width: 0;
-    }
-    .brand-mark {
-      width: 44px;
-      height: 44px;
-      border-radius: 14px;
-      display: grid;
-      place-items: center;
-      background: linear-gradient(135deg, #34d399, #22c55e);
-      color: #062011;
-      font-weight: 900;
-      box-shadow: 0 10px 18px rgba(34, 197, 94, .20);
-      flex: 0 0 auto;
-    }
-    .brand-copy strong { display: block; font-size: 16px; }
-    .brand-copy span { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
-    .nav-links { display: flex; flex-wrap: wrap; gap: 8px; }
-    .nav-links a {
-      text-decoration: none;
-      color: var(--text);
-      padding: 9px 12px;
-      border-radius: 999px;
-      border: 1px solid transparent;
-      background: rgba(34, 197, 94, .08);
-      font-size: 13px;
-    }
-    .nav-links a:hover { border-color: rgba(34, 197, 94, .24); background: rgba(34, 197, 94, .12); }
-    .hero {
-      display: grid;
-      grid-template-columns: 1.08fr .92fr;
-      gap: 20px;
-      margin-bottom: 20px;
-      align-items: stretch;
-    }
-    .panel {
-      background: linear-gradient(180deg, rgba(255, 255, 255, .92), rgba(247, 252, 248, .90));
-      border: 1px solid var(--line);
-      border-radius: 24px;
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(18px);
-    }
-    .hero-copy, .hero-side, .section, .results { padding: 26px; }
-    .eyebrow {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 8px 14px; border-radius: 999px;
-      color: #14532d; background: rgba(34, 197, 94, .10);
-      border: 1px solid rgba(34, 197, 94, .22); font-size: 13px; letter-spacing: .2px;
-    }
-    .hero-copy h1 {
-      margin: 16px 0 12px;
-      font-size: clamp(34px, 4vw, 58px);
-      line-height: 1.04;
-      letter-spacing: -0.02em;
-    }
-    .hero-copy p {
-      margin: 0;
-      font-size: 16px;
-      line-height: 1.85;
-      color: var(--muted);
-      max-width: 62ch;
-    }
-    .hero-highlights { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
-    .chip {
-      padding: 9px 12px; border-radius: 999px;
-      border: 1px solid var(--line);
-      background: rgba(34,197,94,.06);
-      color: #1f5130; font-size: 13px;
-    }
-    .hero-side {
-      display: grid; gap: 16px;
-      grid-template-rows: auto 1fr;
-    }
-    .side-card {
-      border-radius: 20px;
-      border: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(255,255,255,.86), rgba(244, 251, 246, .92));
-      padding: 18px;
-    }
-    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
-    .stat {
-      padding: 14px 12px; border-radius: 16px;
-      background: rgba(34,197,94,.06);
-      border: 1px solid var(--line);
-    }
-    .stat strong { display: block; font-size: 20px; margin-bottom: 4px; }
-    .stat span { color: var(--muted); font-size: 13px; }
-    .section-title {
-      display: flex; justify-content: space-between; align-items: end; gap: 10px;
-      margin-bottom: 16px;
-    }
-    .section-title h2 {
-      margin: 0; font-size: 22px; letter-spacing: -.01em;
-    }
-    .section-title p { margin: 0; color: var(--muted); font-size: 13px; }
-    .tutorial-grid {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
-    }
-    .tutorial-card, .flow-card {
-      border-radius: 20px;
-      border: 1px solid var(--line);
-      background: rgba(34,197,94,.05);
-      padding: 18px;
-    }
-    .step-num {
-      width: 36px; height: 36px; border-radius: 999px;
-      display: inline-flex; align-items: center; justify-content: center;
-      background: linear-gradient(135deg, var(--accent), #86efac);
-      color: #052014; font-weight: 800; margin-bottom: 14px;
-    }
-    .tutorial-card h3, .flow-node h3 { margin: 0 0 10px; font-size: 17px; }
-    .tutorial-card p, .flow-card p, .flow-node p { margin: 0; color: var(--muted); line-height: 1.7; font-size: 14px; }
-    .guide-list {
-      margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 10px;
-    }
-    .guide-list li {
-      padding: 10px 12px; border-radius: 14px;
-      background: rgba(34,197,94,.06); border: 1px solid var(--line);
-      color: #234436; font-size: 14px; line-height: 1.6;
-    }
-    .flow-track {
-      display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;
-      align-items: stretch;
-    }
-    .flow-node {
-      position: relative;
-      padding: 18px 16px 16px;
-      border-radius: 18px;
-      background: linear-gradient(180deg, rgba(255,255,255,.90), rgba(242, 251, 245, .96));
-      border: 1px solid var(--line);
-      min-height: 154px;
-    }
-    .flow-node::after {
-      content: "→";
-      position: absolute;
-      right: -14px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: rgba(22, 48, 31, .48);
-      font-size: 18px;
-      display: none;
-    }
-    .flow-node:not(:last-child)::after { display: block; }
-    .flow-kicker {
-      display: inline-flex; align-items: center; gap: 6px;
-      font-size: 12px; color: #14532d; margin-bottom: 12px;
-      padding: 6px 10px; border-radius: 999px; background: rgba(34, 197, 94, .12); border: 1px solid rgba(34, 197, 94, .22);
-    }
-    .upload-layout { display: grid; grid-template-columns: 1.05fr .95fr; gap: 18px; }
-    .preview-pane, .form-pane {
-      border-radius: 22px; border: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(244, 251, 246, .94));
-      padding: 20px;
-    }
-    .preview-shell {
-      min-height: 420px; border-radius: 20px;
-      border: 1px dashed rgba(34, 197, 94, .28);
-      background:
-        radial-gradient(circle at top right, rgba(132, 204, 22, .12), transparent 22%),
-        linear-gradient(180deg, rgba(248, 253, 249, .96), rgba(236, 248, 239, .94));
-      padding: 18px;
-    }
-    .preview-shell h3 { margin: 0 0 10px; font-size: 18px; }
-    .preview-state { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
-    .image-view {
-      width: 100%; border-radius: 18px; overflow: hidden;
-      border: 1px solid rgba(34, 197, 94, .16);
-      background: rgba(255,255,255,.72);
-    }
-    .image-view img { display: block; width: 100%; height: auto; }
-    .upload-box {
-      border: 1px solid rgba(34, 197, 94, .20);
-      border-radius: 18px;
-      padding: 18px;
-      background: rgba(34,197,94,.05);
-    }
-    .upload-box input[type=file], .upload-box input[type=url] {
-      width: 100%;
-      color: var(--text);
-      background: rgba(255,255,255,.82);
-      border: 1px solid rgba(34, 197, 94, .18);
-      border-radius: 12px;
-      padding: 11px 12px;
-      outline: none;
-    }
-    .field-label { display: block; margin: 12px 0 8px; color: #234436; font-size: 13px; }
-    .actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; align-items: center; }
-    .btn {
-      appearance: none; border: 0; border-radius: 14px; padding: 12px 18px;
-      background: linear-gradient(135deg, #22c55e, #86efac);
-      color: #062011; font-weight: 800; cursor: pointer;
-      box-shadow: 0 10px 26px rgba(34, 197, 94, .18);
-      transition: transform .18s ease, opacity .18s ease, filter .18s ease;
-    }
-    .btn:hover { transform: translateY(-1px); }
-    .btn.secondary {
-      background: linear-gradient(135deg, rgba(255,255,255,.92), rgba(229, 251, 233, .95));
-      color: #14532d;
-      border: 1px solid rgba(34, 197, 94, .22);
-      box-shadow: 0 10px 26px rgba(34, 197, 94, .10);
-    }
-    .btn:disabled,
-    .btn.is-disabled {
-      opacity: .45;
-      cursor: not-allowed;
-      transform: none;
-      filter: grayscale(.2);
-    }
-    .hint { color: var(--muted); font-size: 13px; line-height: 1.6; }
-    .meta-line { color: var(--muted); font-size: 13px; margin-top: 10px; line-height: 1.7; }
-    .results { margin-top: 20px; }
-    .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-    .result-card {
-      border-radius: 22px; border: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(10, 19, 28, .94), rgba(8, 15, 22, .9));
-      padding: 20px;
-    }
-    .result-card h2 { margin: 0 0 14px; font-size: 20px; }
-    .summary { white-space: pre-wrap; line-height: 1.85; font-size: 16px; color: #edf6fb; }
-    .probs { display: grid; gap: 10px; }
-    .prob {
-      display: flex; justify-content: space-between; gap: 10px; align-items: center;
-      padding: 12px 14px; border-radius: 14px;
-      background: rgba(34,197,94,.05); border: 1px solid var(--line);
-    }
-    .progress-bar {
-      height: 8px; border-radius: 999px; margin-top: 8px;
-      background: rgba(255,255,255,.07); overflow: hidden;
-    }
-    .progress-bar > span {
-      display: block; height: 100%; border-radius: inherit;
-      background: linear-gradient(90deg, #22c55e, #86efac);
-    }
-    /* 大幅结果区仪表盘 */
-    .meter {
-      width: 160px; height: 160px; border-radius: 999px; display: inline-grid;
-      place-items: center; position: relative; margin: 6px auto 0;
-      background: conic-gradient(from -90deg, #22c55e 0deg 144deg, #86efac 144deg 252deg, #16a34a 252deg 360deg);
-      box-shadow: 0 18px 40px rgba(2,6,23,.55), inset 0 -6px 20px rgba(2,6,23,.4);
-      border: 1px solid rgba(255,255,255,.04);
-    }
-    .meter .meter-fill { width: 88%; height: 88%; border-radius: 999px; display: grid; place-items: center; background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01)); }
-    .meter .meter-center { text-align: center; color: #ecfeff; font-weight: 800; }
-    .meter .meter-center .big { font-size: 28px; line-height: 1; }
-    .meter .meter-center .small { font-size: 12px; color: var(--muted); margin-top: 4px; }
-    .result-highlight {
-      border-radius: 16px; padding: 12px; margin-top: 12px;
-      background: linear-gradient(180deg, rgba(34,197,94,.08), rgba(34,197,94,.03));
-      border: 1px solid rgba(34,197,94,.14); color: #14532d;
-    }
-    .result-actions {
-      display: flex; justify-content: flex-end; gap: 10px; margin: 6px 0 14px; flex-wrap: wrap;
-    }
-    .result-actions .btn { padding-inline: 14px; }
-    .error {
-      margin-top: 18px; padding: 14px 16px; border-radius: 16px;
-      background: rgba(220, 38, 38, .08); color: #991b1b;
-      border: 1px solid rgba(220, 38, 38, .18);
-    }
-    .footer { margin-top: 16px; color: var(--muted); font-size: 13px; line-height: 1.7; }
-    .section { margin-top: 18px; }
-    .callout {
-      margin-top: 12px; padding: 14px 16px; border-radius: 16px;
-      background: rgba(34, 197, 94, .08); border: 1px solid rgba(34, 197, 94, .18);
-      color: #14532d; font-size: 13px; line-height: 1.7;
-    }
-    @media (max-width: 1100px) {
-      .hero, .upload-layout, .result-grid { grid-template-columns: 1fr; }
-      .tutorial-grid, .flow-track { grid-template-columns: 1fr; }
-      .flow-node::after { display: none; }
-    }
-    @media (max-width: 700px) {
-      .wrap { padding: 16px 12px 34px; }
-      .hero-copy, .hero-side, .section, .results { padding: 18px; }
-      .hero-copy h1 { font-size: 30px; }
-      .stat-grid { grid-template-columns: 1fr; }
-    }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="topbar">
-      <div class="brand">
-        <div class="brand-mark">智农</div>
-        <div class="brand-copy">
-          <strong>农作物病虫害AI智能识别预警系统</strong>
-          <span>拍照识别病虫害，有网就能用</span>
-        </div>
-      </div>
-      <div class="nav-links">
-        <a href="#home">首页</a>
-        <a href="#overview">项目介绍</a>
-        <a href="#upload">上传识别</a>
-        <a href="#results">识别结果</a>
-      </div>
-    </div>
-    <div class="hero-banner panel" style="margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;padding:20px 26px;">
-      <div style="display:flex;gap:18px;align-items:center;"> 
-        <div style="width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,#34d399,#10b981);display:grid;place-items:center;font-weight:900;color:#042014;">智农</div>
-        <div>
-          <div style="font-size:14px;color:var(--muted)">稻花香里说丰年 · 农作物病虫害AI智能识别预警系统</div>
-          <div style="font-size:20px;font-weight:800">拍照识别病虫害，一秒看到结果</div>
-        </div>
-      </div>
-      <div style="display:flex;gap:12px;align-items:center">
-        <button class="btn" onclick="document.getElementById('image_input').click();">上传图片</button>
-        <a href="#upload" class="btn secondary" style="text-decoration:none;color:inherit">开始识别</a>
-      </div>
-    </div>
-    <div class="hero" id="home">
-      <div class="panel hero-copy">
-        <div class="eyebrow">一句话介绍：拍照识别病虫害</div>
-        <h1>让农作物叶片自己说话</h1>
-        <p>农民伯伯只需要给庄稼叶子拍张照片，系统就能识别出农作物的病虫害种类，给出防治建议，并把结果整理成便于汇报的预警信息。这个页面保留了智农式的展示结构，同时兼顾本地上传、URL 预览和模型推理。</p>
-        <div class="hero-highlights">
-          <span class="chip">拍照、上传、一秒识别</span>
-          <span class="chip">有网就能用</span>
-          <span class="chip">支持 JPG / PNG / BMP</span>
-          <span class="chip">多任务联合学习</span>
-        </div>
-      </div>
-      <div class="panel hero-side">
-        <div class="side-card">
-          <div class="section-title" style="margin-bottom: 10px;">
-            <h2>如何使用“智农”</h2>
-            <p>有网就能用</p>
-          </div>
-          <ul class="guide-list">
-            <li>网页端直接上传图片，或者粘贴公开图片 URL。</li>
-            <li>先生成预览缩略图，确认内容无误后再开始评估。</li>
-            <li>查看识别结果、严重程度、风险评分和处理建议。</li>
-          </ul>
-        </div>
-        <div class="side-card">
-          <div class="section-title" style="margin-bottom: 12px;">
-            <h2>应用场景</h2>
-            <p>展示与汇报</p>
-          </div>
-          <div class="stat-grid">
-            <div class="stat"><strong>网页</strong><span>只要有网就能用</span></div>
-            <div class="stat"><strong>辅助</strong><span>专家与农户都能看</span></div>
-            <div class="stat"><strong>预警</strong><span>结果可用于整理报告</span></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="panel section" style="padding: 0; overflow: hidden;">
-      <div style="display:grid; grid-template-columns: 1.05fr .95fr; min-height: 340px;">
-        <div style="padding: 28px; display:flex; flex-direction:column; justify-content:center; gap: 18px; background: linear-gradient(135deg, rgba(34,197,94,.10), rgba(255,255,255,0));">
-          <div class="eyebrow" style="width: fit-content;">项目官网式介绍区</div>
-          <h2 style="margin:0; font-size: clamp(28px, 3.4vw, 44px); line-height: 1.08;">把农业病害识别做成一页清晰、可演示、可汇报的产品页面</h2>
-          <p style="margin:0; color: var(--muted); line-height: 1.9; font-size: 16px; max-width: 60ch;">这个首页沿用 EasyFarming 那种“问题背景 - 使用方式 - 应用场景 - 黑科技 - 结果展示”的叙事节奏，但用你当前项目的模型和接口来落地。页面本身已经可以作为答辩、项目展示或课程汇报的首页。</p>
-          <div class="hero-highlights" style="margin-top: 0;">
-            <span class="chip">首页叙事</span>
-            <span class="chip">项目介绍</span>
-            <span class="chip">识别入口</span>
-            <span class="chip">结果预警</span>
-          </div>
-        </div>
-        <div style="padding: 20px; display:grid; place-items:center; background:
-          radial-gradient(circle at 25% 20%, rgba(34,197,94,.16), transparent 18%),
-          radial-gradient(circle at 76% 26%, rgba(132,204,22,.16), transparent 18%),
-          linear-gradient(180deg, rgba(245,253,247,.95), rgba(232,247,236,.92));">
-          <div style="width: min(100%, 360px); border-radius: 30px; padding: 18px; border: 1px solid rgba(34,197,94,.16); background: rgba(255,255,255,.78); box-shadow: 0 24px 60px rgba(34, 197, 94, .14);">
-            <div style="border-radius: 24px; overflow: hidden; min-height: 260px; background: linear-gradient(160deg, #dcfce7, #bbf7d0 48%, #fef9c3);
-              display:grid; place-items:center; position:relative;">
-              <div style="position:absolute; inset: 18px; border: 2px dashed rgba(21,128,61,.28); border-radius: 20px;"></div>
-              <div style="text-align:center; color:#14532d; padding: 20px; max-width: 240px;">
-                <div style="font-size: 44px; line-height: 1; margin-bottom: 10px;">🌱</div>
-                <div style="font-size: 18px; font-weight: 800; margin-bottom: 8px;">农田数据看板</div>
-                <div style="font-size: 13px; line-height: 1.7; color:#4b6a57;">绿色系主视觉，突出农业、预警、识别和汇报感。</div>
-              </div>
-            </div>
-            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px;">
-              <div class="stat"><strong>识别</strong><span>病虫害种类</span></div>
-              <div class="stat"><strong>预警</strong><span>风险评分</span></div>
-              <div class="stat"><strong>汇报</strong><span>结果图下载</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="panel section" id="overview">
-      <div class="section-title">
-        <h2>项目速览</h2>
-        <p>把 EasyFarming 的展示结构放到这个页面里</p>
-      </div>
-      <div class="tutorial-grid">
-        <div class="tutorial-card">
-          <div class="step-num">1</div>
-          <h3>一句话介绍</h3>
-          <p>给庄稼叶子拍张照片，系统自动识别病虫害，并输出防治建议。</p>
-        </div>
-        <div class="tutorial-card">
-          <div class="step-num">2</div>
-          <h3>如何使用</h3>
-          <p>网页、App、微信小程序都可以扩展成统一入口，打开即用，用完即走。</p>
-        </div>
-        <div class="tutorial-card">
-          <div class="step-num">3</div>
-          <h3>应用场景</h3>
-          <p>拍照识别、作物病害早预警、农药化肥精准投放、宏观农业数据采集。</p>
-        </div>
-        <div class="tutorial-card">
-          <div class="step-num">4</div>
-          <h3>黑科技</h3>
-          <p>基于深度残差网络和多任务学习，把分类、严重程度和风险评估串成一个流程。</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="panel section" id="upload">
-      <div class="section-title">
-        <h2>完整链路</h2>
-        <p>从图片到预警的四步流程</p>
-      </div>
-      <div class="flow-track">
-        <div class="flow-node">
-          <div class="flow-kicker">Step 01</div>
-          <h3>拍照或上传</h3>
-          <p>选择本地图片，或者输入公开图片 URL 作为识别入口。</p>
-        </div>
-        <div class="flow-node">
-          <div class="flow-kicker">Step 02</div>
-          <h3>先做预览</h3>
-          <p>系统先生成缩略图，确认内容正确后再启动推理。</p>
-        </div>
-        <div class="flow-node">
-          <div class="flow-kicker">Step 03</div>
-          <h3>模型判断</h3>
-          <p>调用多任务模型，输出病害风险、严重程度与建议摘要。</p>
-        </div>
-        <div class="flow-node">
-          <div class="flow-kicker">Step 04</div>
-          <h3>生成报告</h3>
-          <p>保存结果图与 JSON 报告，方便汇报、展示和复查。</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="panel section">
-      <div class="section-title">
-        <h2>上传与预览</h2>
-        <p>先确认图片，再进入模型识别</p>
-      </div>
-      <div class="upload-layout">
-        <div class="preview-pane">
-          <div class="preview-shell">
-            <h3>图片预览</h3>
-            <div class="preview-state" id="preview_status">等待上传或输入 URL</div>
-            <div class="image-view" id="preview_card" {% if not preview_b64 %}style="display:none;"{% endif %}>
-              <img id="preview_img" src="{% if preview_b64 %}data:image/png;base64,{{ preview_b64 }}{% endif %}" alt="预览图">
-            </div>
-            <div class="callout">提示：如果是本地图片，选择文件后会自动生成缩略图；如果是 URL，请先点“预览”，确认后再开始识别。</div>
-          </div>
-        </div>
-        <div class="form-pane">
-          <form method="post" enctype="multipart/form-data" id="upload_form">
-            <div class="upload-box">
-              <label class="field-label">1. 选择本地图片</label>
-              <input type="file" name="image" accept="image/*" id="image_input">
-              <label class="field-label">2. 或输入图片 URL</label>
-              <input type="url" name="image_url" id="image_url" placeholder="https://example.com/image.jpg">
-              <input type="hidden" name="preview_b64" id="preview_b64" value="{{ preview_b64 or '' }}">
-              <div class="actions">
-                <button class="btn secondary" type="submit" name="action" value="preview">预览</button>
-                <button class="btn" type="submit" name="action" value="predict" id="predict_btn" {% if not preview_b64 %}disabled{% endif %}>开始识别</button>
-                <span class="hint">评估按钮会在预览成功后自动解锁，避免直接处理未确认文件。</span>
-              </div>
-              <div class="meta-line">提示：使用的后端模型为 <strong>best_multitask_model.pth</strong>，推理时会自动做 128×128 归一化预处理。</div>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    {% if result %}
-    <div class="panel results" id="results">
-      <div class="section-title">
-        <h2>识别结果与预警建议</h2>
-        <p>模型反馈与概率分布</p>
-      </div>
-      <div class="result-actions">
-        <button class="btn secondary" id="copy_summary_btn" onclick="copySummary();">复制摘要</button>
-        <button class="btn secondary" id="share_btn" onclick="shareResult();">分享结果</button>
-        <button class="btn secondary" id="download_json_btn" onclick="downloadReport();">下载报告</button>
-        <button class="btn" id="download_img_btn" onclick="downloadAnnotated();">下载结果图</button>
-      </div>
-      <div class="result-grid">
-        <div class="result-card">
-          <h2>模型反馈图</h2>
-          <div class="image-view">
-            <img src="data:image/png;base64,{{ result.annotated_image }}" alt="评估结果图">
-          </div>
-        </div>
-        <div class="result-card">
-          <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;">
-            <div style="flex:0 0 180px;text-align:center;">
-              <div class="meter" id="disease_meter" data-percent="{{ '%.0f'|format(result.meta.disease_risk_percent) }}">
-                <div class="meter-fill">
-                  <div class="meter-center">
-                    <div class="big">{{ '%.0f'|format(result.meta.disease_risk_percent) }}%</div>
-                    <div class="small">病害风险评分</div>
-                  </div>
-                </div>
-              </div>
-              <div class="result-highlight">严重程度：<strong style="margin-left:8px;color:#fff">{{ result.meta.severity }}</strong></div>
-            </div>
-            <div style="flex:1 1 360px;">
-              <h2>评估摘要</h2>
-              <div class="summary">{{ result.summary }}</div>
-              <h2 style="margin-top: 18px;">严重程度概率</h2>
-              <div class="probs">
-                {% for name, value in result.probabilities.items() %}
-                <div class="prob">
-                  <span>{{ name }}</span>
-                  <strong>{{ '%.1f%%'|format(value * 100) }}</strong>
-                </div>
-                <div class="progress-bar"><span style="width: {{ '%.0f'|format(value * 100) }}%;"></span></div>
-                {% endfor %}
-              </div>
-              <h2 style="margin-top: 18px;">运行信息</h2>
-              <div class="meta-line">
-                设备：{{ result.meta.device }}<br>
-                置信度：{{ '%.2f'|format(result.meta.severity_confidence * 100) }}%<br>
-                模型权重：<code>best_multitask_model.pth</code>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    {% endif %}
-
-    {% if error %}
-    <div class="error">{{ error }}</div>
-    {% endif %}
-  </div>
-
-  <script>
-    (function() {
-      const form = document.getElementById('upload_form');
-      const fileInput = document.getElementById('image_input');
-      const urlInput = document.getElementById('image_url');
-      const previewField = document.getElementById('preview_b64');
-      const previewImg = document.getElementById('preview_img');
-      const previewCard = document.getElementById('preview_card');
-      const previewStatus = document.getElementById('preview_status');
-      const predictBtn = document.getElementById('predict_btn');
-
-      function setPredictLocked(locked) {
-        predictBtn.disabled = locked;
-        predictBtn.classList.toggle('is-disabled', locked);
-      }
-
-      function setPreview(src, label) {
-        previewImg.src = src;
-        previewCard.style.display = 'block';
-        previewStatus.textContent = label;
-        previewField.value = src.startsWith('data:') ? src.split(',')[1] : src;
-        setPredictLocked(false);
-      }
-
-      function clearPreview(lock = true) {
-        previewField.value = '';
-        previewImg.removeAttribute('src');
-        previewCard.style.display = 'none';
-        previewStatus.textContent = '等待上传或输入 URL';
-        if (lock) setPredictLocked(true);
-      }
-
-      if (fileInput) {
-        fileInput.addEventListener('change', function() {
-          const file = fileInput.files && fileInput.files[0];
-          if (!file) {
-            clearPreview();
-            return;
-          }
-          const reader = new FileReader();
-          reader.onload = function() {
-            setPreview(reader.result, '本地缩略图已生成，评估按钮已解锁');
-          };
-          reader.readAsDataURL(file);
-          if (urlInput.value.trim()) urlInput.value = '';
-        });
-      }
-
-      if (urlInput) {
-        urlInput.addEventListener('input', function() {
-          if (urlInput.value.trim()) {
-            clearPreview();
-          }
-        });
-      }
-
-      if (form) {
-        form.addEventListener('submit', function(ev) {
-          const action = ev.submitter && ev.submitter.value ? ev.submitter.value : 'preview';
-          if (action === 'predict' && !previewField.value.trim()) {
-            ev.preventDefault();
-            previewStatus.textContent = '请先预览成功，再开始评估。';
-          }
-        });
-      }
-
-      window.addEventListener('DOMContentLoaded', function() {
-        if (previewField.value.trim()) {
-          if (previewField.value.startsWith('data:')) {
-            previewImg.src = previewField.value;
-          } else {
-            previewImg.src = 'data:image/png;base64,' + previewField.value;
-          }
-          previewCard.style.display = 'block';
-          previewStatus.textContent = '预览已就绪，评估按钮已解锁';
-          setPredictLocked(false);
-        } else {
-          setPredictLocked(true);
-        }
-        // animate meter if exists
-        try {
-          function meterClass(value) {
-            if (value < 40) return '健康';
-            if (value < 70) return '警告';
-            return '高风险';
-          }
-
-          function buildMeterGradient(value) {
-            const greenEnd = 40;
-            const warnEnd = 70;
-            const clamped = Math.max(0, Math.min(100, value));
-            const greenDeg = Math.min(clamped, greenEnd) * 3.6;
-            const warnDeg = Math.min(clamped, warnEnd) * 3.6;
-            const endDeg = clamped * 3.6;
-            return `conic-gradient(from -90deg, #22c55e 0deg ${greenDeg}deg, #f59e0b ${greenDeg}deg ${warnDeg}deg, #ef4444 ${warnDeg}deg ${endDeg}deg, rgba(255,255,255,0.06) ${endDeg}deg 360deg)`;
-          }
-
-          function animateMeters() {
-            document.querySelectorAll('.meter[data-percent]').forEach(el => {
-              const target = Number(el.getAttribute('data-percent')) || 0;
-              let start = null;
-              const duration = 1200;
-              const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
-              function step(ts) {
-                if (!start) start = ts;
-                const t = Math.min(1, (ts - start) / duration);
-                const current = Math.round(easeOutCubic(t) * target);
-                el.style.background = buildMeterGradient(current);
-                const text = el.querySelector('.big');
-                if (text) text.textContent = current + '%';
-                if (t < 1) requestAnimationFrame(step);
-              }
-              requestAnimationFrame(step);
-            });
-          }
-          animateMeters();
-        } catch (e) { console.warn('meter animate failed', e); }
-
-        window.copySummary = async function() {
-          try {
-            const report = buildShareText();
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-              await navigator.clipboard.writeText(report);
-            } else {
-              const ta = document.createElement('textarea');
-              ta.value = report;
-              document.body.appendChild(ta);
-              ta.select();
-              document.execCommand('copy');
-              ta.remove();
-            }
-            alert('摘要已复制');
-          } catch (e) { console.warn(e); alert('复制失败'); }
-        }
-
-        window.shareResult = async function() {
-          try {
-            const text = buildShareText();
-            const url = window.location.href;
-            if (navigator.share) {
-              await navigator.share({ title: '植物病害图片评估结果', text, url });
-            } else {
-              await navigator.clipboard.writeText(text + '\n' + url);
-              alert('当前浏览器不支持原生分享，已复制分享文案');
-            }
-          } catch (e) { console.warn(e); alert('分享失败'); }
-        }
-
-        function buildShareText() {
-          const summaryEl = document.querySelector('.summary');
-          const metaEl = document.querySelector('.meta-line');
-          const meterEl = document.querySelector('.meter .meter-center .big');
-          const severityEl = document.querySelector('.result-highlight strong');
-          const title = '植物病害图片评估结果';
-          const score = meterEl ? meterEl.textContent.trim() : '';
-          const severity = severityEl ? severityEl.textContent.trim() : '';
-          return [
-            title,
-            score ? `病害风险评分：${score}` : '',
-            severity ? `严重程度：${severity}` : '',
-            summaryEl ? summaryEl.textContent.trim() : '',
-            metaEl ? metaEl.textContent.trim().replace(/\s+/g, ' ') : ''
-          ].filter(Boolean).join('\n');
-        }
-
-        // download helpers for result actions
-        window.downloadAnnotated = function() {
-          try {
-            const img = document.querySelector('.panel.results img');
-            if (!img || !img.src) { alert('未找到结果图像'); return; }
-            const a = document.createElement('a');
-            a.href = img.src;
-            a.download = 'evaluation_result.png';
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-          } catch (e) { console.warn(e); alert('下载失败'); }
-        }
-
-        window.downloadReport = function() {
-          try {
-            const summaryEl = document.querySelector('.summary');
-            const metaEl = document.querySelector('.meta-line');
-            const probsEls = document.querySelectorAll('.probs .prob');
-            const probs = {};
-            probsEls.forEach(p => {
-              const key = p.querySelector('span') && p.querySelector('span').textContent.trim();
-              const val = p.querySelector('strong') && p.querySelector('strong').textContent.trim();
-              if (key) probs[key] = val;
-            });
-            const img = document.querySelector('.panel.results img');
-            const report = {
-              summary: summaryEl ? summaryEl.textContent.trim() : '',
-              meta: metaEl ? metaEl.textContent.trim() : '',
-              probabilities: probs,
-              annotated_image: img ? img.src : null,
-            };
-            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = 'evaluation_report.json';
-            document.body.appendChild(a); a.click(); a.remove();
-            URL.revokeObjectURL(url);
-          } catch (e) { console.warn(e); alert('导出报告失败'); }
-        }
-      });
-    })();
-  </script>
-</body>
-</html>
-"""
-
-
 @app.route("/", methods=["GET", "POST"])
 def index():
   result = None
   error = None
   preview_b64 = None
+  preview_token = None
   debug_path = None
 
   def _bytes_from_source(file, image_url):
@@ -1056,12 +390,51 @@ def index():
             buf = io.BytesIO()
             image.save(buf, format="PNG")
             preview_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+            # save raw upload to tmp directory and return a token so predict step does not need to re-upload
+            tmp_dir = os.path.join(os.getcwd(), 'tmp_uploads')
+            os.makedirs(tmp_dir, exist_ok=True)
+            try:
+              import uuid
+              token = f'{uuid.uuid4().hex}.bin'
+              tmp_path = os.path.join(tmp_dir, token)
+              with open(tmp_path, 'wb') as fh:
+                fh.write(data)
+              preview_token = token
+            except Exception:
+              preview_token = None
         else:
           # predict
-          if not carried_preview:
-            raise ValueError("请先预览成功，再开始评估。")
-          preview_b64 = _normalize_preview_b64(carried_preview)
-          image = _image_from_preview_b64(carried_preview)
+          # support preview carried as token (server-side temp file) or base64
+          token_from_form = (request.form.get('preview_token') or '').strip()
+          if token_from_form:
+            tmp_path = os.path.join(os.getcwd(), 'tmp_uploads', token_from_form)
+            if not os.path.exists(tmp_path):
+              raise ValueError('预览已过期或不存在，请重新预览。')
+            with open(tmp_path, 'rb') as fh:
+              data = fh.read()
+            # 用完即删临时文件
+            try:
+              os.remove(tmp_path)
+            except Exception:
+              pass
+            image = _decode_bytes_to_image(data)
+            # also populate preview_b64 for template rendering
+            buf = io.BytesIO()
+            image.save(buf, format='PNG')
+            preview_b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+            preview_token = token_from_form
+          elif file and getattr(file, 'filename', ''):
+            # Fallback: allow direct prediction from the uploaded file when preview_b64 is missing.
+            data = _bytes_from_source(file, image_url)
+            image = _decode_bytes_to_image(data)
+            buf = io.BytesIO()
+            image.save(buf, format='PNG')
+            preview_b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+          else:
+            if not carried_preview:
+              raise ValueError("请先预览成功，再开始评估。")
+            preview_b64 = _normalize_preview_b64(carried_preview)
+            image = _image_from_preview_b64(carried_preview)
 
           # optional MC dropout samples (传表单 mc_samples)
           try:
@@ -1128,15 +501,141 @@ def index():
           }
           logger.info('Generated report %s (pdf=%s) for request from %s', json_path, pdf_path, request.remote_addr)
       except Exception as exc:
-        import traceback
-
-        traceback.print_exc()
+        logger.exception('Failed to process request')
         if debug_path:
           error = f"图片处理失败：{exc} (已保存原始上传为: {debug_path})"
         else:
           error = f"图片处理失败：{exc}"
 
-  return render_template("index.html", result=result, error=error, preview_b64=preview_b64)
+  # prepare chart data for ECharts frontend using recent reports (falls back to demo)
+  chart_data = None
+  try:
+    reports_dir = os.path.join(os.getcwd(), 'reports')
+    labels = []
+    risk = []
+    suggestion = []
+    confidence_series = []
+
+    if os.path.isdir(reports_dir):
+      files = sorted(glob.glob(os.path.join(reports_dir, '*.json')), key=os.path.getmtime)
+      if files:
+        last = files[-7:]
+        for f in last:
+          try:
+            with open(f, 'r', encoding='utf-8') as fh:
+              obj = json.load(fh)
+            gen = obj.get('generated_at') or os.path.basename(f)
+            labels.append(gen)
+            meta = obj.get('meta', {}) or {}
+            dr = meta.get('disease_risk_percent')
+            if dr is None:
+              dr = meta.get('disease_risk') or meta.get('risk_percent') or 50
+            try:
+              drv = int(dr)
+            except Exception:
+              drv = int(float(dr) if dr else 50)
+            risk.append(max(0, min(100, drv)))
+            # suggestion: simple heuristic derived from risk
+            suggestion.append(max(0, min(100, 60 + (50 - drv) // 1)))
+            sc = meta.get('severity_confidence') or meta.get('confidence') or 0.95
+            try:
+              csv = float(sc) * 100
+            except Exception:
+              csv = 95.0
+            confidence_series.append(max(0, min(100, int(csv))))
+          except Exception:
+            continue
+
+    if labels:
+      chart_data = {'labels': labels, 'risk': risk, 'suggestion': suggestion, 'confidence': confidence_series}
+    else:
+      if result:
+        meta = result.get('meta', {}) if isinstance(result, dict) else {}
+        base = int(meta.get('disease_risk_percent', 50)) if meta else 50
+        confidence = float(meta.get('severity_confidence', 0.95)) * 100 if meta else 95.0
+        labels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+        risk = [max(0, min(100, base + d)) for d in (-6, -3, 0, 4, 1, -2, -5)]
+        suggestion = [max(0, min(100, 60 + i * 3)) for i in range(7)]
+        confidence_series = [max(0, min(100, int(confidence + d))) for d in (-5, -2, 0, 1, 2, -1, -4)]
+        chart_data = {'labels': labels, 'risk': risk, 'suggestion': suggestion, 'confidence': confidence_series}
+  except Exception:
+    chart_data = None
+
+  chart_json = json.dumps(chart_data, ensure_ascii=False) if chart_data is not None else 'null'
+  return render_template("index.html", result=result, error=error, preview_b64=preview_b64, preview_token=preview_token, chart_data=chart_json)
+
+
+
+@app.route('/batch_predict', methods=['POST'])
+def batch_predict():
+    """批量预测接口：接受多张图片或ZIP压缩包，返回JSON结果数组。"""
+    import zipfile
+    import tempfile
+
+    images_to_process = []
+    error_prefix = ""
+
+    # 1) 收集图片 ── 从 batch_images 字段 (multiple files)
+    batch_files = request.files.getlist('batch_images')
+    for f in batch_files:
+        if f and f.filename:
+            data = f.read()
+            if len(data) > app.config.get('MAX_CONTENT_LENGTH', 10 * 1024 * 1024):
+                continue  # skip oversized
+            if _detect_image_signature(data) is not None:
+                images_to_process.append((f.filename, data))
+
+    # 2) 收集图片 ── 从 batch_zip 字段 (ZIP 压缩包)
+    zip_file = request.files.get('batch_zip')
+    if zip_file and zip_file.filename and zip_file.filename.lower().endswith('.zip'):
+        try:
+            zip_data = zip_file.read()
+            with tempfile.TemporaryDirectory() as tmpdir:
+                zippath = os.path.join(tmpdir, 'batch.zip')
+                with open(zippath, 'wb') as fh:
+                    fh.write(zip_data)
+                with zipfile.ZipFile(zippath, 'r') as zf:
+                    for info in zf.infolist():
+                        if info.filename.startswith('__') or info.filename.startswith('.'):
+                            continue
+                        ext = os.path.splitext(info.filename.lower())[1]
+                        if ext not in _ALLOWED_EXTS:
+                            continue
+                        try:
+                            img_data = zf.read(info)
+                            if _detect_image_signature(img_data) is not None:
+                                images_to_process.append((info.filename, img_data))
+                        except Exception:
+                            continue
+        except Exception as exc:
+            logger.warning('Failed to process batch zip: %s', exc)
+            return jsonify({'error': f'ZIP 解压失败: {exc}'}), 400
+
+    if not images_to_process:
+        return jsonify({'error': '未找到有效的图片文件。支持直接上传图片或 ZIP 压缩包。'}), 400
+
+    results = []
+    for fname, img_data in images_to_process:
+        try:
+            image = _decode_bytes_to_image(img_data)
+            annotated, summary, probabilities, meta = predict_image(image)
+            results.append({
+                'filename': fname,
+                'disease_name': meta.get('disease_name', '未知'),
+                'severity': meta.get('severity', '未知'),
+                'risk_score': meta.get('disease_risk_percent'),
+                'confidence': round(meta.get('disease_confidence', 0) * 100, 2),
+                'severity_confidence': round(meta.get('severity_confidence', 0) * 100, 2),
+                'summary': summary,
+            })
+        except Exception as exc:
+            logger.warning('Batch predict failed for %s: %s', fname, exc)
+            results.append({
+                'filename': fname,
+                'error': str(exc),
+            })
+
+    return jsonify({'results': results, 'total': len(results)})
 
 
 @app.route('/reports/<path:fname>')
@@ -1150,4 +649,5 @@ def download_report(fname):
 if __name__ == "__main__":
   host = os.environ.get("APP_HOST", "0.0.0.0")
   port = int(os.environ.get("APP_PORT", "7860"))
+  print(f"Starting Flask app on {host}:{port}")
   app.run(host=host, port=port, debug=False)

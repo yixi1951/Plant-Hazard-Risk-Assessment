@@ -37,15 +37,57 @@
   }
 
   if (fileInput) {
+    let compressedBlob = null;
     fileInput.addEventListener('change', function() {
       const file = fileInput.files && fileInput.files[0];
       if (!file) {
         clearPreview();
         return;
       }
+      const maxDim = 1024;
       const reader = new FileReader();
       reader.onload = function() {
-        setPreview(reader.result, '本地缩略图已生成，评估按钮已解锁');
+        const img = new Image();
+        img.onload = function() {
+          try {
+            let w = img.width, h = img.height;
+            const scale = Math.max(w, h) > maxDim ? (maxDim / Math.max(w, h)) : 1;
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(w * scale);
+            canvas.height = Math.round(h * scale);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(function(blob) {
+              if (blob) {
+                compressedBlob = blob;
+                // create preview data URL
+                const previewReader = new FileReader();
+                previewReader.onload = function() {
+                  setPreview(previewReader.result, '本地缩略图已生成，评估按钮已解锁（已压缩）');
+                };
+                previewReader.readAsDataURL(blob);
+                // Replace file input with compressed file so native form submit sends the smaller payload
+                try {
+                  var compressedFile = new File([blob], (file.name || 'upload').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+                  var dt = new DataTransfer();
+                  dt.items.add(compressedFile);
+                  fileInput.files = dt.files;
+                } catch (e) {
+                  console.warn('Failed to set compressed file on input', e);
+                }
+              } else {
+                // fallback
+                setPreview(reader.result, '本地缩略图已生成，评估按钮已解锁');
+              }
+            }, 'image/jpeg', 0.8);
+          } catch (e) {
+            setPreview(reader.result, '本地缩略图已生成');
+          }
+        };
+        img.onerror = function() {
+          setPreview(reader.result, '本地缩略图已生成');
+        };
+        img.src = reader.result;
       };
       reader.readAsDataURL(file);
       if (urlInput.value.trim()) urlInput.value = '';
@@ -63,39 +105,13 @@
   if (form) {
     form.addEventListener('submit', function(ev) {
       const action = ev.submitter && ev.submitter.value ? ev.submitter.value : 'preview';
-      if (action === 'predict') {
+      if (action === 'predict' && (!previewField || !previewField.value.trim())) {
         ev.preventDefault();
-        // send via XHR to monitor upload progress
-        const fd = new FormData(form);
-        fd.set('action', 'predict');
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', window.location.pathname, true);
-        xhr.responseType = 'document';
-
-        xhr.upload.onprogress = function(e) {
-          if (!e.lengthComputable) return;
-          const percent = Math.round((e.loaded / e.total) * 100);
-          if (uploadProgress) uploadProgress.style.display = 'block';
-          if (uploadProgressBar) uploadProgressBar.value = percent;
-          if (uploadProgressText) uploadProgressText.textContent = '上传进度：' + percent + '%';
-        };
-
-        xhr.onload = function() {
-          // replace page with returned HTML document
-          if (xhr.status >= 200 && xhr.status < 300) {
-            document.open();
-            document.write(xhr.response.documentElement.outerHTML);
-            document.close();
-          } else {
-            alert('上传或评估失败，HTTP ' + xhr.status);
-          }
-        };
-
-        xhr.onerror = function() { alert('网络错误，上传失败。'); };
-        xhr.send(fd);
-      } else {
-        // let preview submit as normal to server (server-side preview)
+        previewStatus.textContent = '请先预览成功，再开始评估。';
+        return;
       }
+      // Let the browser perform a normal form POST so the returned HTML renders directly.
+      // The image file has already been replaced by the compressed version above.
     });
   }
 

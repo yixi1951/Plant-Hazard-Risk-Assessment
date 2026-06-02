@@ -21,7 +21,7 @@
 - `data/`：数据
 - `docs/`：展示说明
 - `scripts/`：运行和准备脚本
-- `q1new.py`：主训练入口
+- `train_multitask_model.py`：主训练入口
 
 ## 公开数据集接入方式
 将公开数据集整理为：
@@ -31,5 +31,5 @@
 然后执行：
 
 ```powershell
-.\.venv\Scripts\python.exe q1new.py --dataset-mode public --data-dir data/public_dataset --sample-ratio 1.0 --epochs 5 --patience 2
+.\.venv\Scripts\python.exe train_multitask_model.py --dataset-mode public --data-dir data/public_dataset --sample-ratio 1.0 --epochs 5 --patience 2
 ```

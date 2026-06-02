@@ -12,7 +12,8 @@
 
 ## 你会看到什么
 
-- 训练主模型：`q1new.py`
+- 训练主模型：`train_multitask_model.py`
+- 训练“可识别具体病害名称”的多任务模型：`scripts/train_disease_multitask.py`
 - 生成模拟数据：`scripts/generate_mock_dataset.py`
 - 运行上传评估界面：`app.py`
 - 输出诊断结果：`diagnostic_reports/`
@@ -40,14 +41,52 @@ python scripts/generate_mock_dataset.py --output-dir data/mock_problem_b --num-c
 模拟数据：
 
 ```powershell
-python q1new.py --data-dir data/mock_problem_b --sample-ratio 1.0 --epochs 5 --patience 2
+python train_multitask_model.py --data-dir data/mock_problem_b --sample-ratio 1.0 --epochs 5 --patience 2
 ```
 
 PlantVillage 数据：
 
 ```powershell
-python q1new.py --dataset-mode plantvillage --data-dir data/plantvillage --sample-ratio 1.0 --epochs 15 --patience 5
+python train_multitask_model.py --dataset-mode plantvillage --data-dir data/plantvillage --sample-ratio 1.0 --epochs 15 --patience 5
 ```
+
+### 3.1 训练可识别具体病害名称的模型
+
+如果你的数据已经按“类别文件夹”整理好，例如 `train/Apple_scab/*.jpg`、`train/healthy/*.jpg`，可以直接训练一个会输出“病害名称 + 严重程度”的模型：
+
+```powershell
+python scripts/train_disease_multitask.py --train-dir data/plantvillage/train --val-dir data/plantvillage/val --save-path artifacts/disease_multitask.pth --epochs 15 --batch-size 32
+```
+
+训练完成后会生成：
+
+- `artifacts/disease_multitask.pth`
+- `artifacts/disease_multitask.json`
+
+页面推理时如果要使用新模型，只需设置：
+
+```powershell
+$env:MODEL_PATH='artifacts/disease_multitask.pth'
+python app.py
+```
+
+这样页面就能直接显示“识别到什么病”，而不仅是风险分数。
+
+### 3.2 适配 Kaggle 数据目录
+
+如果你下载的是 Kaggle 版数据集，先把原始目录整理成 `train/val` 结构，再直接复用当前训练流程：
+
+```powershell
+python scripts/prepare_kaggle_dataset.py --source-dir D:\kaggle\PlantVillage --output-dir data/kaggle_plantvillage --train-ratio 0.8
+python train_multitask_model.py --dataset-mode kaggle --data-dir data/kaggle_plantvillage --sample-ratio 1.0 --epochs 15 --patience 5
+```
+
+脚本会把 Kaggle 目录下的类别文件夹自动切分为：
+
+- `data/kaggle_plantvillage/train/<class_name>/*.jpg`
+- `data/kaggle_plantvillage/val/<class_name>/*.jpg`
+
+这样就能无缝接入你现在这套多任务训练、推理和 Web 页面。
 
 ### 4. 启动 Web 页面
 
@@ -73,11 +112,11 @@ python app.py
 
 ## 目录结构
 
-- `q1.py`：病害分类基础模型
-- `q1new.py`：多任务联合学习主入口
-- `q2.py`：少样本学习与可视化
-- `q3.py`：严重程度三分类与 Grad-CAM 可视化
-- `q4.py`：多任务诊断与风险评估
+- `train_disease_classifier.py`：病害分类基础模型
+- `train_multitask_model.py`：多任务联合学习主入口
+- `few_shot_classification.py`：少样本学习与可视化
+- `severity_gradcam.py`：严重程度三分类与 Grad-CAM 可视化
+- `risk_assessment.py`：多任务诊断与风险评估
 - `app.py`：图片上传评估界面
 - `scripts/`：训练、数据准备与测试脚本
 - `data/`：数据集目录
@@ -177,4 +216,79 @@ docker run -p 7860:7860 agri-ai:latest
 - 将应用置于反向代理后面（如 Nginx），并启用 HTTPS。
 - 对公开 API 限频（rate limiting）以防滥用。
 - 在需要时使用专门的文件扫描/杀毒服务对上传内容做进一步检测。
+
+## 示例截图
+
+- 首页仪表盘（示例）： `reports/report_20260531_161200.json` 中对应的结果图和历史趋势会在仪表盘中呈现。
+
+### 仪表盘预览（示例图）
+
+<p align="center">
+	<img src="static/screenshots/readme_1.png" alt="Dashboard 示例" width="880">
+</p>
+
+*图 1：仪表盘示例（来自批量推理的注释图） — 显示历史病害风险趋势与关键快捷统计。*
+
+### 结果示例（示例图）
+
+<p align="center">
+	<img src="static/screenshots/readme_2.png" alt="评估结果示例" width="520">
+</p>
+
+*图 2：识别结果示例（来自批量推理的注释图） — 模型输出的病害类别、严重程度与风险评分摘要。*
+
+(注：当前 README 中使用的是示例截图与示例报告，部署到真实服务器后建议替换为真实截图或托管链接。)
+
+## 开发流程（本地复现）
+
+1. 准备环境：创建并激活虚拟环境，安装依赖（见上文）。
+2. 数据准备：将数据放入 `data/`，如果是 Kaggle 数据，先在本地解压并按下面的建议划分目录。可运行 `scripts/generate_mock_dataset.py` 快速生成测试用数据。
+3. 划分数据集：建议按照 80% train / 10% val / 10% test 划分；或使用 k-fold（例如 5-fold）进行更稳健的超参搜索与模型验证。切记：**不要在训练或调参时使用 test 集**，test 仅用于最终评估。
+
+示例目录结构（训练/验证/测试）:
+
+```
+data/plantvillage/
+	train/
+		classA/
+		classB/
+	val/
+		classA/
+		classB/
+	test/
+		classA/
+		classB/
+```
+
+4. 训练示例（用 `train_multitask_model.py`）：
+
+```powershell
+python train_multitask_model.py --data-dir data/plantvillage --epochs 20 --batch-size 32 --patience 5 --save-dir artifacts/
+```
+
+5. 验证与早停：在训练脚本中使用 `--patience` 参数或在训练循环中监控验证集指标并保存最优权重。
+
+6. 生成报告：推理后，结果与 JSON 报告会写入 `reports/`，Web 页面会自动读取最近的报告以绘制历史趋势图。
+
+## 测试
+
+- 单元/集成测试：项目包含若干测试脚本（例如 `test.py`、`test_upload.py`），可直接用 Python 运行或用 `pytest`（如已安装）：
+
+```powershell
+pytest -q
+```
+
+## 贡献与许可
+
+- 欢迎 issue 与 PR，建议先在 issue 中描述你的改进点。
+- 若需商业使用或署名许可，请在合并前选择合适的 `LICENSE`（常用 MIT / Apache-2.0）。
+
+---
+
+如果你需要，我可以：
+- 把当前示例截图复制到 `static/` 并在 README 中嵌入预览；
+- 添加 `CONTRIBUTING.md`、`LICENSE`（例如 MIT）并初始化 GitHub 仓库的推荐文件；
+- 编写训练数据拆分脚本（从 Kaggle 下载后的自动划分与重命名）。
+
+请告诉我你希望下一步我代办哪项。
 

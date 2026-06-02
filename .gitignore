@@ -23,8 +23,22 @@ diagnostic_reports/
 *.pth
 *.pt
 *.ckpt
+*.onnx
 *.log
-upload_debug_*.bin
+*.bin
+
+# Generated directories
+tmp_uploads/
+reports/
+runs/
+artifacts/
+few_shot_visualizations/
+grad_cam_visualizations/
+diagnostic_reports/
+
+# OS
+Thumbs.db
+.DS_Store
 
 # IDE
 .idea/
