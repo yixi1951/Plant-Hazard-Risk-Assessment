@@ -43,3 +43,8 @@ Thumbs.db
 # IDE
 .idea/
 .vscode/
+.cursor/
+
+# Temp
+%TEMP%/
+~$*

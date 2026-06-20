@@ -1,18 +1,38 @@
 {% extends "base.html" %}
+{% set active_page = 'team' %}
 {% block title %}团队介绍 - 智农{% endblock %}
+{% block crumbs %}团队介绍{% endblock %}
+{% block page_title %}项目团队{% endblock %}
+{% block page_desc %}个人全栈 AI 项目，涵盖模型训练、后端服务与前端界面。{% endblock %}
+
 {% block content %}
-<div class="panel section">
-  <div class="section-title">
-    <h2>团队介绍</h2>
-    <p>项目成员与分工</p>
+<section class="content-panel">
+  <div class="team-grid">
+    <div class="team-card">
+      <div class="team-avatar">张</div>
+      <h3>张三</h3>
+      <p class="team-role">项目负责人</p>
+      <p class="team-desc">系统架构、多任务模型设计与训练</p>
+    </div>
+    <div class="team-card">
+      <div class="team-avatar">李</div>
+      <h3>李四</h3>
+      <p class="team-role">前端开发</p>
+      <p class="team-desc">UI 设计、交互实现与 ECharts 可视化</p>
+    </div>
+    <div class="team-card">
+      <div class="team-avatar">王</div>
+      <h3>王五</h3>
+      <p class="team-role">后端开发</p>
+      <p class="team-desc">Flask 服务、API 与防治方案引擎</p>
+    </div>
+    <div class="team-card">
+      <div class="team-avatar">赵</div>
+      <h3>赵六</h3>
+      <p class="team-role">数据工程</p>
+      <p class="team-desc">PlantVillage/Kaggle 数据准备与标注</p>
+    </div>
   </div>
-  <ul class="guide-list">
-    <li>张三（项目负责人）：系统架构与模型设计</li>
-    <li>李四（前端开发）：UI设计与前端实现</li>
-    <li>王五（后端开发）：Flask后端与API开发</li>
-    <li>赵六（数据工程）：数据收集与标注</li>
-    <li>孙七（测试与运维）：测试、部署与文档</li>
-  </ul>
-  <p class="meta-line">如需合作或了解更多，请联系 <a href="mailto:contact@zhinong.com">contact@zhinong.com</a></p>
-</div>
+  <p class="panel-text mt-3">如需合作或了解更多，请联系 <a href="mailto:contact@zhinong.com">contact@zhinong.com</a></p>
+</section>
 {% endblock %}

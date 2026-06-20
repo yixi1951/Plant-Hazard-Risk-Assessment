@@ -10,6 +10,8 @@ import torchvision.transforms as transforms
 from PIL import Image, ImageDraw, ImageFont
 from torchvision import models
 
+from scripts.treatment_engine import build_treatment_plan
+
 
 IMAGE_SIZE = 128
 SEVERITY_LABELS = ["健康", "一般", "严重"]
@@ -189,6 +191,7 @@ def predict_image(image, model_path="best_multitask_model.pth", device_name=None
             predicted_disease_idx = int(torch.tensor(disease_probs).argmax().item())
             disease_name = class_names[predicted_disease_idx] if predicted_disease_idx < len(class_names) else f"病害_{predicted_disease_idx}"
             disease_conf = float(disease_probs[predicted_disease_idx])
+            disease_class_idx = predicted_disease_idx
 
             healthy_indices = [idx for idx, name in enumerate(class_names) if _is_healthy_label(name)]
             if healthy_indices:
@@ -201,28 +204,42 @@ def predict_image(image, model_path="best_multitask_model.pth", device_name=None
     severity_name = SEVERITY_LABELS[severity_idx]
     severity_conf = severity_probs[severity_idx]
 
-    if severity_idx == 0 and disease_risk < 50:
-        advice = "当前结果偏向健康，建议继续保持常规巡检。"
+    disease_class_idx = locals().get('disease_class_idx')
+    treatment_plan = build_treatment_plan(
+        disease_name=disease_name,
+        severity=severity_name,
+        disease_idx=disease_class_idx if disease_logits.shape[1] > 1 else None,
+        risk_percent=disease_risk,
+        confidence=disease_conf,
+    )
+
+    if treatment_plan.get("actionable_summary") or treatment_plan.get("quick_suggestion"):
+        advice = treatment_plan.get("actionable_summary") or treatment_plan.get("quick_suggestion")
+    elif treatment_plan.get("is_healthy") or (severity_idx == 0 and disease_risk < 50):
+        advice = "当前结果偏向健康：每 7 天巡检叶背，雨季前喷施 1 次保护性药剂。"
     elif severity_idx == 1:
-        advice = "检测到一般风险，建议尽快复查叶片并关注病斑变化。"
+        advice = "一般风险：24h 内清除病叶，按方案用药，7 天拍照复查病斑面积。"
     else:
-        advice = "检测到较高风险，建议及时隔离、处理病叶并进一步人工复核。"
+        advice = "较高风险：立即隔离重病株、清除病叶，3 天内复查并咨询植保站。"
 
     summary = (
-        f"识别病害: {disease_name} (置信度 {disease_conf:.1%})\n"
+        f"识别病害: {treatment_plan['disease_name']} (置信度 {disease_conf:.1%})\n"
+        f"作物类型: {treatment_plan['crop']}\n"
         f"病害风险评分: {disease_risk:.1f}%\n"
         f"严重程度: {severity_name} (置信度 {severity_conf:.1%})\n"
-        f"反馈: {advice}"
+        f"紧急程度: {treatment_plan['urgency']}\n"
+        f"防治建议: {advice}\n"
+        f"预计成本: {treatment_plan['estimated_cost']} · 周期: {treatment_plan['treatment_duration']}"
     )
 
     annotated = annotate_result(
         image,
         title="植物病害评估结果",
         lines=[
-            f"识别病害: {disease_name}",
+            f"识别病害: {treatment_plan['disease_name']}",
             f"病害风险: {disease_risk:.1f}%",
             f"严重程度: {severity_name}",
-            f"建议: {advice}",
+            f"建议: {advice[:40]}{'...' if len(advice) > 40 else ''}",
         ],
     )
 
@@ -234,11 +251,15 @@ def predict_image(image, model_path="best_multitask_model.pth", device_name=None
     meta = {
         "device": str(device),
         "disease_risk_percent": round(disease_risk, 2),
-        "disease_name": disease_name,
+        "disease_name": treatment_plan["disease_name"],
         "disease_confidence": round(disease_conf, 4),
         "severity": severity_name,
         "severity_confidence": round(float(severity_conf), 4),
         "class_names": class_names,
+        "crop": treatment_plan["crop"],
+        "urgency": treatment_plan["urgency"],
+        "urgency_score": treatment_plan["urgency_score"],
+        "treatment_plan": treatment_plan,
     }
     return annotated, summary, probability_map, meta
 
@@ -292,6 +313,14 @@ def predict_with_uncertainty(image, mc_samples=16, model_path="best_multitask_mo
         "severity_std": [round(float(x), 4) for x in severity_std],
         "mc_samples": int(mc_samples),
     })
+    if meta.get("treatment_plan"):
+        meta["treatment_plan"] = build_treatment_plan(
+            disease_name=meta.get("disease_name"),
+            severity=meta.get("severity", "一般"),
+            risk_percent=meta.get("disease_risk_percent", 50),
+            confidence=meta.get("disease_confidence", 0.9),
+            mc_std=meta["disease_std"],
+        )
 
     # replace probability_map with mean values
     probability_map = {k: round(float(v), 4) for k, v in zip(SEVERITY_LABELS, severity_mean)}

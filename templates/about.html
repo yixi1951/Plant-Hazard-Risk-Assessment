@@ -1,17 +1,48 @@
 {% extends "base.html" %}
+{% set active_page = 'about' %}
 {% block title %}关于项目 - 智农{% endblock %}
+{% block crumbs %}关于项目{% endblock %}
+{% block page_title %}关于智农{% endblock %}
+{% block page_desc %}端到端农作物病害智能诊断系统，从数据训练到 Web 部署与防治方案生成。{% endblock %}
+
 {% block content %}
-<div class="panel section">
-  <div class="section-title">
-    <h2>关于项目</h2>
-    <p>项目背景与目标</p>
+<section class="content-panel">
+  <h2 class="panel-heading">项目简介</h2>
+  <p class="panel-text">「智农」面向农业生产场景，农户和专家上传作物叶片照片，AI 自动识别病害类型、评估严重程度与风险等级，并输出可执行的分步防治方案。</p>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="feature-icon feature-icon-ai" aria-hidden="true"></div>
+      <h3>多任务 AI</h3>
+      <p>单模型同时输出病害种类、严重程度与风险评分</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon feature-icon-leaf" aria-hidden="true"></div>
+      <h3>防治方案</h3>
+      <p>化学/绿色防治、分步路线图、智能复查时间线</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon feature-icon-chart" aria-hidden="true"></div>
+      <h3>可视化</h3>
+      <p>风险趋势图、Grad-CAM 热力图、JSON/PDF 报告</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon feature-icon-api" aria-hidden="true"></div>
+      <h3>可扩展</h3>
+      <p>REST API、批量预测、Kaggle 数据演示流程</p>
+    </div>
   </div>
-  <p>“智农”农作物病虫害AI智能识别预警系统，旨在为农业生产提供便捷、智能的病虫害识别与风险预警服务。通过深度学习模型和现代Web技术，农户和专家可随时随地上传作物叶片图片，系统自动识别病害类型、严重程度，并给出防治建议，助力农业减损增收。</p>
+</section>
+
+<section class="content-panel">
+  <h2 class="panel-heading">核心能力</h2>
   <ul class="guide-list">
-    <li>支持多种作物和常见病虫害识别</li>
-    <li>一键生成预警报告，便于汇报与追溯</li>
-    <li>绿色系视觉，突出农业科技感</li>
-    <li>可扩展API，便于集成到更多平台</li>
+    <li>内置 60+ 种病害/健康状态知识库，支持按作物筛选与用药安全提示</li>
+    <li>支持苹果、樱桃、玉米、葡萄、番茄、马铃薯等多种作物病虫害识别</li>
+    <li>MC Dropout 不确定性量化，低置信度提醒人工复核</li>
+    <li>严重程度自适应：健康 / 一般 / 严重对应不同处置策略</li>
+    <li>拖拽上传、URL 抓图、ZIP 批量预测</li>
+    <li>一键生成 JSON/PDF 预警报告</li>
   </ul>
-</div>
+</section>
 {% endblock %}

@@ -1,18 +1,90 @@
 {% extends "base.html" %}
+{% set active_page = 'api' %}
 {% block title %}API文档 - 智农{% endblock %}
+{% block crumbs %}API 文档{% endblock %}
+{% block page_title %}开放接口{% endblock %}
+{% block page_desc %}RESTful API，便于第三方平台集成病虫害识别、仪表盘统计与批量分析。{% endblock %}
+
 {% block content %}
-<div class="panel section">
-  <div class="section-title">
-    <h2>API文档</h2>
-    <p>开放接口说明</p>
+<section class="content-panel">
+  <h2 class="panel-heading">接口列表</h2>
+  <div class="api-table-wrap">
+    <table class="api-table">
+      <thead>
+        <tr><th>方法</th><th>路径</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>POST</code></td><td><code>/api/preview</code></td><td>AJAX 生成预览（返回 preview_b64 / preview_token）</td></tr>
+        <tr><td><code>POST</code></td><td><code>/</code></td><td>表单上传图片识别（action=predict）</td></tr>
+        <tr><td><code>POST</code></td><td><code>/batch_predict</code></td><td>批量预测，支持多图或 ZIP，含可视化聚合</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/diseases</code></td><td>可识别病害列表（含防治方案）</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/dashboard_stats</code></td><td>仪表盘统计、趋势图、可视化聚合</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/report_count</code></td><td>报告数量统计</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/demo/showcase</code></td><td>客户演示样例列表（无需模型）</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/demo/case/&lt;id&gt;</code></td><td>单条演示识别结果 JSON</td></tr>
+        <tr><td><code>POST</code></td><td><code>/api/demo/seed</code></td><td>注入/刷新 7 条演示诊断报告</td></tr>
+        <tr><td><code>GET</code></td><td><code>/?demo_case=corn_blight</code></td><td>首页展示指定演示样例</td></tr>
+        <tr><td><code>GET</code></td><td><code>/reports/&lt;fname&gt;</code></td><td>下载 JSON/PDF 报告</td></tr>
+      </tbody>
+    </table>
   </div>
-  <p>本系统提供RESTful API，便于第三方平台集成病虫害识别能力。</p>
-  <ul class="guide-list">
-    <li><strong>POST /api/predict</strong>：上传图片，返回识别结果（JSON）</li>
-    <li><strong>参数</strong>：image（二进制文件），或 image_url（图片URL）</li>
-    <li><strong>返回</strong>：summary、probabilities、meta、annotated_image（base64）</li>
-    <li><strong>错误码</strong>：400参数错误，500服务异常</li>
+</section>
+
+<section class="content-panel">
+  <h2 class="panel-heading">GET /api/dashboard_stats</h2>
+  <p class="panel-text">返回概览统计、<strong>与筛选条件一致的趋势图数据</strong>（<code>chart_data</code>），以及 ECharts 用的 <code>visualization</code> 聚合对象。</p>
+  <h3 class="panel-subheading">查询参数</h3>
+  <table class="api-table">
+    <thead><tr><th>参数</th><th>取值</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>days</code></td><td><code>all</code>（默认）、<code>7</code>、<code>30</code></td><td>仅统计 <code>generated_at</code> 在最近 N 天内的报告</td></tr>
+      <tr><td><code>source</code></td><td><code>all</code>、<code>real</code>、<code>demo</code></td><td>全部 / 仅真实识别 / 仅演示（<code>demo=true</code> 或文件名 <code>demo_*</code>）</td></tr>
+    </tbody>
+  </table>
+  <pre class="code-block"><code>curl "http://localhost:7860/api/dashboard_stats?days=7&amp;source=demo"</code></pre>
+  <p class="panel-text">响应片段：</p>
+  <pre class="code-block"><code>{
+  "filter_days": 7,
+  "filter_source": "demo",
+  "filtered_report_count": 7,
+  "chart_data": {
+    "labels": ["6/8", "6/9", "..."],
+    "risk": [82, 58, ...],
+    "suggestion": [...],
+    "confidence": [...]
+  },
+  "visualization": {
+    "report_count": 7,
+    "severity_pie": [...],
+    "disease_top": [...],
+    "summary": { "avg_risk": 52.1, "avg_confidence": 90.2, "high_risk_count": 2 }
+  }
+}</code></pre>
+</section>
+
+<section class="content-panel">
+  <h2 class="panel-heading">POST /batch_predict</h2>
+  <p class="panel-text">表单字段：<code>batch_images</code>（多文件）、<code>batch_zip</code>（ZIP）；可选 <code>save_reports=1</code> 将每条成功识别写入 <code>reports/</code>（标准 JSON schema）。</p>
+  <pre class="code-block"><code>curl -X POST http://localhost:7860/batch_predict \
+  -F "batch_images=@leaf1.jpg" \
+  -F "batch_images=@leaf2.jpg" \
+  -F "save_reports=1"</code></pre>
+  <p class="panel-text">响应字段：</p>
+  <ul class="panel-list">
+    <li><code>results[]</code> — 每项含 <code>disease_name</code>、<code>severity</code>、<code>risk_score</code>、<code>confidence</code>、<code>urgency</code> 或 <code>error</code></li>
+    <li><code>batch_visualization</code> — 本次批量的图表数据（成功/失败、风险区间、病种 Top、严重程度）</li>
+    <li><code>batch_id</code>、<code>reports_saved</code></li>
   </ul>
-  <div class="callout">如需API密钥或定制开发，请联系团队。</div>
-</div>
+  <p class="panel-text">Web 端批量完成后可导出 <strong>CSV / JSON / 批量图表 PNG</strong>。</p>
+</section>
+
+<section class="content-panel">
+  <h2 class="panel-heading">报告 JSON 字段（schema v1）</h2>
+  <p class="panel-text">见 <code>scripts/report_schema.py</code>。顶层：<code>schema_version</code>、<code>generated_at</code>、<code>demo</code>、<code>source</code>、<code>summary</code>、<code>probabilities</code>、<code>meta</code>、<code>treatment_plan</code>；批量可选 <code>batch_id</code>、<code>input_filename</code>。</p>
+  <p class="panel-text"><code>meta</code> 建议字段：<code>disease_name</code>、<code>crop</code>、<code>severity</code>、<code>disease_risk_percent</code>、<code>severity_confidence</code>、<code>urgency</code> — 供仪表盘筛选与聚合。</p>
+</section>
+
+<section class="content-panel callout-panel">
+  <p>更多说明见项目 <code>README.md</code>「仪表盘与数据可视化」「模型架构」章节。</p>
+</section>
 {% endblock %}

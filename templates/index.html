@@ -5,106 +5,189 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>智农 · 农作物病虫害AI智能识别预警系统</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('favicon') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
 </head>
-<body>
-<div class="dashboard-shell art-galaxy-shell">
+<body class="light-theme theme-field-atlas">
+<div class="page-atmosphere" aria-hidden="true">
+  <div class="field-leaves" aria-hidden="true">
+    <span class="leaf-float leaf-1"></span>
+    <span class="leaf-float leaf-2"></span>
+    <span class="leaf-float leaf-3"></span>
+    <span class="leaf-float leaf-4"></span>
+    <span class="leaf-float leaf-5"></span>
+  </div>
+</div>
+<div class="dashboard-shell">
   <aside class="admin-sidebar">
     <div class="brand-card">
-      <div class="brand-badge">智农</div>
-      <div>
-        <div class="brand-title">Agri Control</div>
-        <div class="brand-subtitle">art-design-pro × galaxy 融合版</div>
-      </div>
+      <a href="/" class="brand-link">
+        <div class="brand-badge"><span class="brand-badge-mark">智</span></div>
+        <div>
+          <div class="brand-title">Field Atlas</div>
+          <div class="brand-subtitle">智农 · 病虫害 AI 预警</div>
+        </div>
+      </a>
     </div>
 
     <div class="sidebar-section">
       <div class="sidebar-label">导航</div>
-      <a class="sidebar-link active" href="#overview">Dashboard</a>
-      <a class="sidebar-link" href="#metrics">Panel Group</a>
-      <a class="sidebar-link" href="#analytics">Charts</a>
-      <a class="sidebar-link" href="#upload">Upload</a>
-      <a class="sidebar-link" href="#results">Results</a>
+      <a class="sidebar-link active" href="/"><span class="nav-icon"></span>识别控制台</a>
+      <a class="sidebar-link" href="#overview"><span class="nav-icon"></span>概览</a>
+      <a class="sidebar-link" href="#upload"><span class="nav-icon"></span>上传识别</a>
+      <a class="sidebar-link" href="#" id="sidebar_disease_list"><span class="nav-icon"></span>病害库</a>
     </div>
 
     <div class="sidebar-section">
-      <div class="sidebar-label">快捷信息</div>
-      <div class="sidebar-info">
-        <strong>95.8%</strong>
-        <span>模型平均置信度</span>
-      </div>
-      <div class="sidebar-info">
-        <strong>4</strong>
-        <span>当前展示模块</span>
-      </div>
-      <div class="sidebar-info">
-        <strong>Dark</strong>
-        <span>霓虹暗色主题</span>
-      </div>
+      <div class="sidebar-label">快捷操作</div>
+      <button class="btn btn-primary btn-3d w-100 mb-2" type="button" onclick="document.getElementById('image_input').click();">上传图片</button>
+      <button class="btn btn-outline-primary btn-3d w-100 mb-2" type="button" onclick="document.getElementById('batch_file_input').click();">批量预测</button>
     </div>
 
     <div class="sidebar-section">
-      <div class="sidebar-label">操作</div>
-      <button class="btn btn-primary w-100 mb-2" onclick="document.getElementById('image_input').click();">上传图片</button>
-      <a class="btn btn-outline-light w-100" href="#upload">开始识别</a>
+      <div class="sidebar-label">更多</div>
+      <a class="sidebar-link" href="/about"><span class="nav-icon"></span>关于项目</a>
+      <a class="sidebar-link" href="/faq"><span class="nav-icon"></span>常见问题</a>
+      <a class="sidebar-link" href="/team"><span class="nav-icon"></span>团队介绍</a>
+      <a class="sidebar-link" href="/api"><span class="nav-icon"></span>API 文档</a>
     </div>
   </aside>
 
   <main class="admin-main">
-    <section class="topbar-panel">
-      <div>
-        <div class="crumbs">Dashboard / 智农 / 识别中心</div>
-        <h1>农作物病虫害识别控制台</h1>
-        <p>参考 <span class="accent-text">vue-element-admin</span> 的仪表盘结构，再叠加 <span class="accent-text galaxy-text">galaxy</span> 的渐变、发光和深色氛围。</p>
+    <section class="topbar-panel topbar-hero reveal-up">
+      <div class="topbar-accent" aria-hidden="true"></div>
+      <div class="topbar-copy">
+        <div class="crumbs"><span class="crumb-leaf" aria-hidden="true"></span>智农 / 识别中心 / 控制台</div>
+        <h1>田野病害<br><em class="headline-accent">智能识别</em>控制台</h1>
+        <p>上传叶片影像，AI 即时诊断病害种类与严重程度，输出可执行的防治路线图与复查时间线。</p>
+        <div class="topbar-stats">
+          <span class="topbar-stat"><strong id="hero_disease_count">--</strong> 可识别病种</span>
+          <span class="topbar-stat-divider" aria-hidden="true"></span>
+          <span class="topbar-stat"><strong id="hero_catalog_hint">35+</strong> 知识库病种</span>
+          <span class="topbar-stat-divider" aria-hidden="true"></span>
+          <span class="topbar-stat"><strong>4</strong> 步完成诊断</span>
+        </div>
       </div>
       <div class="topbar-actions">
-        <div class="search-pill">
-          <i class="bi bi-search"></i>
-          <span>快速搜索 / 病虫害 / 报告</span>
+        <div class="search-pill" id="search_pill" style="cursor:pointer;">
+          <span class="search-pill-icon" aria-hidden="true"></span>
+          <span id="search_text">搜索可识别病害</span>
         </div>
         <div class="status-pill">
           <span class="dot"></span>
-          在线运行中
+          系统在线
         </div>
+      </div>
+    </section>
+
+    <!-- ===== 使用步骤 ===== -->
+    <section class="steps-guide reveal-up reveal-delay-1" id="guide">
+      <div class="steps-title">快速上手 <span class="steps-kicker">4 步完成识别</span></div>
+      <div class="steps-row">
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <div class="step-icon step-icon-upload" aria-hidden="true"></div>
+          <div class="step-name">上传图片</div>
+          <div class="step-desc">拖拽或选择叶片照片，也可输入 URL</div>
+        </div>
+        <div class="step-arrow">→</div>
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <div class="step-icon step-icon-preview" aria-hidden="true"></div>
+          <div class="step-name">预览确认</div>
+          <div class="step-desc">检查图片是否清晰、内容是否正确</div>
+        </div>
+        <div class="step-arrow">→</div>
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <div class="step-icon step-icon-scan" aria-hidden="true"></div>
+          <div class="step-name">AI 识别</div>
+          <div class="step-desc">点击「开始识别」，获取病害与风险评分</div>
+        </div>
+        <div class="step-arrow">→</div>
+        <div class="step-card">
+          <div class="step-num">4</div>
+          <div class="step-icon step-icon-plan" aria-hidden="true"></div>
+          <div class="step-name">查看方案</div>
+          <div class="step-desc">阅读详细防治方案与复查时间线</div>
+        </div>
+      </div>
+      <div class="demo-bar">
+        <span class="demo-hint">系统已内置 <strong>7 条</strong> 演示诊断记录与 <strong>4 个</strong> 识别样例，无需模型即可向客户展示完整流程</span>
+        <button class="btn btn-primary btn-3d btn-sm" id="load_demo_btn" type="button">刷新演示数据</button>
+      </div>
+    </section>
+
+    <!-- ===== 客户演示样例 ===== -->
+    <section class="showcase-section reveal-up reveal-delay-2" id="showcase">
+      <div class="showcase-head">
+        <div>
+          <h2>客户演示样例</h2>
+          <p>点击下方样例卡片，立即查看识别结果、风险评分与完整防治方案（无需上传图片、无需模型权重）。</p>
+        </div>
+        <span class="section-badge">Demo</span>
+      </div>
+      <div class="showcase-grid" id="showcase_grid">
+        {% for c in showcase_cases|default([]) %}
+        <a class="showcase-card card-3d {% if active_demo_case == c.id %}active{% endif %}" href="/?demo_case={{ c.id }}#results_section" data-case="{{ c.id }}">
+          <div class="showcase-card-top">
+            <span class="showcase-severity sev-{{ c.severity }}">{{ c.severity }}</span>
+            <span class="showcase-risk">{{ '%.0f'|format(c.risk) }}%</span>
+          </div>
+          <h3 class="showcase-title">{{ c.disease_name }}</h3>
+          <p class="showcase-crop">{{ c.crop }} · {{ c.label }}</p>
+          <p class="showcase-tip">{{ c.suggestion }}</p>
+          <span class="showcase-cta">查看完整识别结果 →</span>
+        </a>
+        {% endfor %}
       </div>
     </section>
 
     <section class="tag-strip" id="overview">
-      <span class="tag-item active">Dashboard</span>
-      <span class="tag-item">Data View</span>
-      <span class="tag-item">Charts</span>
-      <span class="tag-item">Upload</span>
-      <span class="tag-item">Report</span>
+      <span class="tag-item active" data-target="#overview_section">概览</span>
+      <span class="tag-item" data-target="#analytics">趋势分析</span>
+      <span class="tag-item" data-target="#viz_dashboard">数据图表</span>
+      <span class="tag-item" data-target="#upload">上传识别</span>
+      <span class="tag-item" data-target="#results_section">识别结果</span>
+      {% if result %}<span class="tag-item" data-target="#showcase">演示样例</span>{% endif %}
+      {% if result %}<span class="tag-item" data-target="#treatment_section">防治方案</span>{% endif %}
+      <span class="tag-item" id="tag_disease_list" style="cursor:pointer;">病害库</span>
     </section>
 
-    <section class="panel-group" id="metrics">
-      <article class="card-panel card-panel-cyan glow-panel">
-        <div class="card-panel-icon-wrapper"><span>病</span></div>
+    <section class="panel-group reveal-up reveal-delay-2" id="overview_section">
+      <article class="card-panel card-panel-cyan card-3d clickable-card" id="disease_count_card" data-detail="diseases" tabindex="0" role="button" aria-label="查看可识别病害">
+        <div class="card-panel-icon-wrapper icon-3d"><span>病</span></div>
         <div class="card-panel-description">
-          <div class="card-panel-text">识别病种</div>
-          <div class="card-panel-num">{{ result.meta.severity if result else '12' }}</div>
+          <div class="card-panel-text">可识别病种</div>
+          <div class="card-panel-num" id="disease_count_num">--</div>
+          <div class="card-hint">点击查看病害库 →</div>
         </div>
       </article>
-      <article class="card-panel card-panel-blue glow-panel">
-        <div class="card-panel-icon-wrapper"><span>准</span></div>
+      <article class="card-panel card-panel-blue card-3d clickable-card" id="processed_card" data-detail="processed" tabindex="0" role="button" aria-label="查看已处理记录">
+        <div class="card-panel-icon-wrapper icon-3d"><span>已</span></div>
         <div class="card-panel-description">
-          <div class="card-panel-text">模型准确率</div>
-          <div class="card-panel-num">95.8%</div>
+          <div class="card-panel-text">已处理图片</div>
+          <div class="card-panel-num" id="report_count">--</div>
+          <div class="card-hint">点击查看诊断记录 →</div>
         </div>
       </article>
-      <article class="card-panel card-panel-orange glow-panel">
-        <div class="card-panel-icon-wrapper"><span>报</span></div>
+      <article class="card-panel card-panel-orange card-3d clickable-card" id="reports_card" data-detail="reports" tabindex="0" role="button" aria-label="查看已生成报告">
+        <div class="card-panel-icon-wrapper icon-3d"><span>报</span></div>
         <div class="card-panel-description">
           <div class="card-panel-text">已生成报告</div>
-          <div class="card-panel-num">128</div>
+          <div class="card-panel-num" id="report_file_count">--</div>
+          <div class="card-hint">点击查看报告列表 →</div>
         </div>
       </article>
-      <article class="card-panel card-panel-green glow-panel">
-        <div class="card-panel-icon-wrapper"><span>险</span></div>
+      <article class="card-panel card-panel-green card-3d clickable-card" id="risk_card" data-detail="risk" tabindex="0" role="button" aria-label="查看风险说明">
+        <div class="card-panel-icon-wrapper icon-3d"><span>险</span></div>
         <div class="card-panel-description">
           <div class="card-panel-text">风险预警</div>
-          <div class="card-panel-num">{{ '%.0f'|format(result.meta.disease_risk_percent) if result else '68' }}%</div>
+          <div class="card-panel-num" id="risk_count_num">{{ '%.0f'|format(result.meta.disease_risk_percent) if result else '--' }}%</div>
+          <div class="card-hint">{% if result %}点击查看风险详情{% else %}点击了解风险等级{% endif %} →</div>
         </div>
       </article>
     </section>
@@ -113,12 +196,15 @@
       <div class="chart-panel chart-panel-wide">
         <div class="section-head">
           <div>
-            <h2>Dashboard Trends</h2>
-            <p>借鉴 vue-element-admin 的图表卡片风格，呈现运行趋势和风险分布，同时增加 galaxy 风格的霓虹网格背景。</p>
+            <h2>病害风险趋势</h2>
+            <p>近 7 次诊断的风险评分、置信度与建议指数变化趋势。</p>
           </div>
-          <span class="section-badge">Panel Group</span>
+          <span class="section-badge">Trends</span>
         </div>
-        <div id="trend_chart" class="echart-panel galaxy-chart"></div>
+        <div class="trend-chart-wrap">
+          <div id="trend_chart" class="echart-panel galaxy-chart"></div>
+          <div id="trend_chart_tip" class="trend-chart-tip" hidden></div>
+        </div>
         <div class="chart-legend">
           <span><i class="legend-dot blue"></i> 病害风险</span>
           <span><i class="legend-dot green"></i> 处理建议</span>
@@ -129,25 +215,133 @@
       <div class="chart-panel chart-panel-side neon-side-panel">
         <div class="section-head">
           <div>
-            <h2>Quick Stats</h2>
-            <p>模仿右侧统计卡片与个人概览，使用更强的亮色边界强调内容层级。</p>
+            <h2>系统信息</h2>
+            <p>当前运行状态与环境配置。</p>
           </div>
         </div>
-        <div class="mini-stat">
-          <strong>Upload</strong>
-          <span>本地 / URL 双入口</span>
+        <button type="button" class="mini-stat mini-stat-3d" data-detail="model">
+          <strong>模型</strong>
+          <span>best_multitask_model.pth</span>
+          <em class="mini-hint">点击查看架构 →</em>
+        </button>
+        <button type="button" class="mini-stat mini-stat-3d" data-detail="input">
+          <strong>输入尺寸</strong>
+          <span>128×128 RGB</span>
+          <em class="mini-hint">点击查看预处理 →</em>
+        </button>
+        <button type="button" class="mini-stat mini-stat-3d" data-detail="diseases">
+          <strong>病害类别</strong>
+          <span id="mini_disease_count">加载中...</span>
+          <em class="mini-hint">点击查看列表 →</em>
+        </button>
+        <button type="button" class="mini-stat mini-stat-3d" data-detail="port">
+          <strong>服务端口</strong>
+          <span>7860</span>
+          <em class="mini-hint">点击查看访问方式 →</em>
+        </button>
+        <button type="button" class="mini-stat mini-stat-3d" data-detail="dataset">
+          <strong>数据源</strong>
+          <span>PlantVillage</span>
+          <em class="mini-hint">点击查看数据集 →</em>
+        </button>
+      </div>
+    </section>
+
+    <section class="viz-dashboard reveal-up reveal-delay-2" id="viz_dashboard" aria-labelledby="viz_dashboard_title">
+      <div class="viz-dashboard-head">
+        <div>
+          <h2 id="viz_dashboard_title">诊断数据可视化</h2>
+          <p>基于历史 JSON 报告聚合：严重程度、病种排行、作物分布、风险区间与置信度关系。</p>
         </div>
-        <div class="mini-stat">
-          <strong>Preview</strong>
-          <span>先预览再推理</span>
+        <div class="viz-head-actions">
+          <div class="viz-filter-bar" role="group" aria-label="图表数据筛选">
+            <span class="viz-filter-label">时间</span>
+            <select id="viz_filter_days" class="viz-filter-select" aria-label="时间范围">
+              <option value="all">全部</option>
+              <option value="7">近 7 天</option>
+              <option value="30">近 30 天</option>
+            </select>
+            <span class="viz-filter-label">来源</span>
+            <select id="viz_filter_source" class="viz-filter-select" aria-label="数据来源">
+              <option value="all">全部</option>
+              <option value="real">仅真实识别</option>
+              <option value="demo">仅演示数据</option>
+            </select>
+            <button type="button" class="btn btn-outline-primary btn-3d btn-sm" id="viz_apply_filters">应用筛选</button>
+          </div>
+          <div class="viz-summary-chips" id="viz_summary_chips" aria-live="polite">
+            <span class="viz-chip">报告 <strong id="viz_report_count">--</strong></span>
+            <span class="viz-chip">均风险 <strong id="viz_avg_risk">--</strong></span>
+            <span class="viz-chip">均置信度 <strong id="viz_avg_conf">--</strong></span>
+            <span class="viz-chip viz-chip-warn">高风险 <strong id="viz_high_risk">--</strong></span>
+          </div>
+          <button type="button" class="btn btn-primary btn-3d btn-sm" id="viz_export_png">导出仪表盘 PNG</button>
         </div>
-        <div class="mini-stat">
-          <strong>Report</strong>
-          <span>摘要、图像、JSON 三件套</span>
+      </div>
+      <p class="viz-filter-hint" id="viz_filter_hint" hidden></p>
+      <div class="viz-grid">
+        <div class="chart-panel card-3d">
+          <div class="section-head section-head-compact">
+            <div>
+              <h3 class="viz-chart-title">严重程度分布</h3>
+              <p class="viz-chart-desc">健康 / 一般 / 严重占比</p>
+            </div>
+          </div>
+          <div id="chart_severity_pie" class="echart-panel echart-panel-sm" role="img" aria-label="严重程度饼图"></div>
         </div>
-        <div class="mini-stat">
-          <strong>Theme</strong>
-          <span>Element Admin 视觉语言</span>
+        <div class="chart-panel card-3d">
+          <div class="section-head section-head-compact">
+            <div>
+              <h3 class="viz-chart-title">高风险区间统计</h3>
+              <p class="viz-chart-desc">按病害风险评分分桶</p>
+            </div>
+          </div>
+          <div id="chart_risk_bar" class="echart-panel echart-panel-sm" role="img" aria-label="风险区间柱状图"></div>
+        </div>
+        <div class="chart-panel card-3d viz-span-2">
+          <div class="section-head section-head-compact">
+            <div>
+              <h3 class="viz-chart-title">高频病害 Top 8</h3>
+              <p class="viz-chart-desc">近次诊断中出现次数最多的病种</p>
+            </div>
+          </div>
+          <div id="chart_disease_top" class="echart-panel echart-panel-md" role="img" aria-label="病害排行图"></div>
+        </div>
+        <div class="chart-panel card-3d">
+          <div class="section-head section-head-compact">
+            <div>
+              <h3 class="viz-chart-title">作物分布</h3>
+              <p class="viz-chart-desc">诊断记录或知识库作物构成</p>
+            </div>
+          </div>
+          <div id="chart_crop_pie" class="echart-panel echart-panel-sm" role="img" aria-label="作物分布图"></div>
+        </div>
+        <div class="chart-panel card-3d">
+          <div class="section-head section-head-compact">
+            <div>
+              <h3 class="viz-chart-title">紧急程度</h3>
+              <p class="viz-chart-desc">防治方案紧急度统计</p>
+            </div>
+          </div>
+          <div id="chart_urgency_pie" class="echart-panel echart-panel-sm" role="img" aria-label="紧急程度图"></div>
+        </div>
+        <div class="chart-panel card-3d">
+          <div class="section-head section-head-compact">
+            <div>
+              <h3 class="viz-chart-title">诊断活跃度</h3>
+              <p class="viz-chart-desc">按日期的识别次数</p>
+            </div>
+          </div>
+          <div id="chart_activity_bar" class="echart-panel echart-panel-sm" role="img" aria-label="诊断活跃度图"></div>
+        </div>
+        <div class="chart-panel card-3d">
+          <div class="section-head section-head-compact">
+            <div>
+              <h3 class="viz-chart-title">风险 × 置信度</h3>
+              <p class="viz-chart-desc">单次诊断散点（颜色=严重程度）</p>
+            </div>
+          </div>
+          <div id="chart_scatter" class="echart-panel echart-panel-sm" role="img" aria-label="风险置信度散点图"></div>
         </div>
       </div>
     </section>
@@ -157,7 +351,7 @@
         <div class="section-head">
           <div>
             <h2>图片预览</h2>
-            <p>保持 vue-element-admin 那种清晰的卡片分区，再用 galaxy 的玻璃拟态和发光边框强化质感。</p>
+            <p>支持拖拽或点击上传农作物叶片照片，确认后开始识别。</p>
           </div>
           <span class="section-badge">Preview</span>
         </div>
@@ -171,7 +365,6 @@
             <div class="preview-empty-title">等待上传图片</div>
             <div class="preview-empty-text">支持 JPG / PNG / BMP / GIF / TIFF / WEBP</div>
           </div>
-          <div class="callout">先完成预览，再点击开始识别。这样更接近后台操作流，也更像 `vue-element-admin` 的任务处理方式。</div>
         </div>
       </div>
 
@@ -179,36 +372,72 @@
         <div class="section-head">
           <div>
             <h2>识别入口</h2>
-            <p>表单区域保留上传、预览、识别三步。</p>
+            <p>上传图片、输入 URL 或批量预测。</p>
           </div>
           <span class="section-badge">Upload</span>
         </div>
+        <div class="submit-mode-tabs" role="tablist" aria-label="提交方式">
+          <button type="button" class="submit-mode-tab active" data-mode="file" role="tab" aria-selected="true">本地上传</button>
+          <button type="button" class="submit-mode-tab" data-mode="url" role="tab" aria-selected="false">图片链接</button>
+          <button type="button" class="submit-mode-tab" data-mode="batch" role="tab" aria-selected="false">批量识别</button>
+        </div>
+
         <form method="post" enctype="multipart/form-data" id="upload_form" class="upload-box">
-          <label class="field-label">1. 拖拽或选择本地图片</label>
-          <div class="drop-zone" id="drop_zone">
-            <div class="drop-zone-icon">📁</div>
+          <div class="submit-panel submit-panel-file" id="panel_file">
+          <label class="field-label">拖拽或选择叶片照片</label>
+          <div class="drop-zone drop-zone-single" id="drop_zone" role="button" tabindex="0" aria-label="上传图片，支持拖拽或点击选择">
+            <div class="drop-zone-graphic drop-graphic-image" aria-hidden="true"></div>
             <div class="drop-zone-text">拖拽图片到此处，或点击选择文件</div>
-            <div class="drop-zone-hint">支持 JPG / PNG / BMP，单张最大 10MB</div>
-            <input type="file" name="image" accept="image/*" id="image_input" class="drop-zone-input">
+            <div class="drop-zone-hint">JPG · PNG · BMP · WEBP · 单张最大 10MB · 支持粘贴截图</div>
+            <input type="file" name="image" accept="image/*" id="image_input" class="drop-zone-input" aria-hidden="true" tabindex="-1">
+          </div>
           </div>
 
-          <label class="field-label mt-3">2. 或输入图片 URL</label>
-          <input type="url" name="image_url" id="image_url" class="form-control form-control-lg" placeholder="https://example.com/image.jpg">
+          <div class="submit-panel submit-panel-url" id="panel_url" hidden>
+          <label class="field-label">粘贴公网图片 URL</label>
+          <div class="url-input-wrap">
+            <span class="url-input-icon" aria-hidden="true"></span>
+            <input type="url" name="image_url" id="image_url" class="form-control form-control-lg url-input" placeholder="https://example.com/leaf.jpg">
+          </div>
+          <p class="submit-panel-tip">填写后点击「生成预览」，确认叶片清晰后再识别。</p>
+          <button type="button" class="btn btn-primary btn-3d btn-sm mt-2" id="url_preview_predict_btn">一键预览并识别</button>
+          </div>
 
-          <label class="field-label mt-3">3. 批量预测 (多张图片 / ZIP压缩包)</label>
-          <div class="drop-zone batch-zone" id="batch_drop_zone">
-            <div class="drop-zone-icon">🗂️</div>
+          <div class="submit-panel submit-panel-batch" id="panel_batch" hidden>
+          <label class="field-label">批量预测（多张图片 / ZIP）</label>
+          <div class="drop-zone drop-zone-batch batch-zone" id="batch_drop_zone" role="button" tabindex="0" aria-label="批量上传，支持多图或 ZIP">
+            <div class="drop-zone-graphic drop-graphic-batch" aria-hidden="true"></div>
             <div class="drop-zone-text">拖拽多张图片或 ZIP 压缩包到此处</div>
-            <div class="drop-zone-hint">或 <a href="javascript:void(0)" id="batch_file_trigger">点击选择文件</a></div>
-            <input type="file" name="batch_files" accept="image/*,.zip" id="batch_file_input" class="drop-zone-input" multiple>
+            <div class="drop-zone-hint">或 <a href="javascript:void(0)" id="batch_file_trigger" class="drop-zone-link">点击选择文件</a></div>
+            <input type="file" name="batch_images" accept="image/*,.zip" id="batch_file_input" class="drop-zone-input" multiple aria-hidden="true" tabindex="-1">
           </div>
           <div id="batch_file_list" class="batch-file-list" style="display:none;"></div>
+          <label class="option-toggle mt-2">
+            <input type="checkbox" id="batch_save_reports" value="1">
+            <span>将每条成功识别写入 reports/（标准 JSON schema，便于仪表盘统计）</span>
+          </label>
+          </div>
 
           <input type="hidden" name="preview_b64" id="preview_b64" value="{{ preview_b64 or '' }}">
+          <input type="hidden" name="preview_token" id="preview_token" value="{{ preview_token or '' }}">
+
+          <label class="field-label mt-3 upload-options-label">高级选项</label>
+          <div class="advanced-options">
+            <label class="option-toggle">
+              <input type="checkbox" name="mc_samples" value="16" id="mc_samples_toggle">
+              <span>启用 MC Dropout 不确定性分析（16 次采样，结果更可靠但耗时更长）</span>
+            </label>
+            <label class="option-toggle mt-2">
+              <input type="checkbox" id="quick_predict_toggle">
+              <span>快捷模式：选图后自动生成预览（可跳过手动点预览）</span>
+            </label>
+          </div>
+
           <div class="upload-actions">
-            <button class="btn btn-outline-primary" type="submit" name="action" value="preview">预览</button>
-            <button class="btn btn-primary" type="submit" name="action" value="predict" id="predict_btn" {% if not preview_b64 %}disabled{% endif %}>开始识别</button>
-            <button class="btn btn-outline-info" type="button" id="batch_predict_btn" disabled>批量预测</button>
+            <button class="btn btn-outline-primary btn-3d" type="button" id="preview_ajax_btn">生成预览</button>
+            <button class="btn btn-outline-primary btn-3d" type="submit" name="action" value="preview" id="preview_submit_btn">表单预览</button>
+            <button class="btn btn-primary btn-3d" type="submit" name="action" value="predict" id="predict_btn" {% if not preview_b64 %}disabled{% endif %}>开始识别</button>
+            <button class="btn btn-outline-info btn-3d" type="button" id="batch_predict_btn" disabled>批量预测</button>
           </div>
 
           <div id="upload_progress" class="progress-wrap" style="display:none;">
@@ -233,34 +462,50 @@
     </section>
 
     {% if result %}
-    <section class="results-panel glass-panel" id="results">
+    {% if demo_active %}
+    <div class="demo-result-banner">
+      <div class="demo-banner-body">
+        <span class="demo-banner-icon" aria-hidden="true"></span>
+        <span>当前为<strong>客户演示样例</strong>（无需真实图片与模型）。向客户展示后可上传真实叶片照片进行识别。</span>
+      </div>
+      <a class="btn btn-outline-primary btn-3d btn-sm" href="/#upload">上传真实图片</a>
+    </div>
+    {% endif %}
+    <section class="results-panel glass-panel" id="results_section">
       <div class="section-head">
         <div>
           <h2>识别结果与预警建议</h2>
-          <p>保持 vue-element-admin 的“卡片 + 表格 + 图表”叙事风格，并加入 galaxy 的高对比霓虹强调。</p>
+          <p>AI 模型评估结果：病害种类、严重程度分级与防治建议。</p>
         </div>
         <span class="section-badge">Results</span>
       </div>
 
       <div class="result-actions">
-        <button class="btn btn-outline-secondary" id="copy_summary_btn" onclick="copySummary();">复制摘要</button>
-        <button class="btn btn-outline-secondary" id="share_btn" onclick="shareResult();">分享结果</button>
-        <button class="btn btn-outline-secondary" id="download_json_btn" onclick="downloadReport();">下载报告</button>
-        <button class="btn btn-outline-secondary" id="qr_btn" onclick="generateQR();">生成二维码</button>
-        <button class="btn btn-primary" id="download_img_btn" onclick="downloadAnnotated();">下载结果图</button>
+        <button type="button" class="btn btn-outline-secondary result-action-btn" onclick="copySummary();"><span class="result-action-icon icon-copy" aria-hidden="true"></span>复制摘要</button>
+        <button type="button" class="btn btn-outline-secondary result-action-btn" onclick="shareResult();"><span class="result-action-icon icon-share" aria-hidden="true"></span>分享结果</button>
+        <button type="button" class="btn btn-outline-secondary result-action-btn" onclick="downloadReport();"><span class="result-action-icon icon-download" aria-hidden="true"></span>下载 JSON</button>
+        <button type="button" class="btn btn-primary result-action-btn" onclick="downloadAnnotated();"><span class="result-action-icon icon-image" aria-hidden="true"></span>下载结果图</button>
       </div>
 
-      <div id="qr_container" class="qr-container" style="display:none;"></div>
-
       <div class="result-grid">
-        <div class="result-card result-image-card neon-card">
-          <div class="result-card-title">模型反馈图</div>
+        <div class="result-card result-image-card">
+          <div class="result-card-head">
+            <span class="result-card-icon icon-image" aria-hidden="true"></span>
+            <div class="result-card-title">模型反馈图</div>
+          </div>
           <div class="image-view result-image-view">
             <img src="data:image/png;base64,{{ result.annotated_image }}" alt="评估结果图">
           </div>
         </div>
 
-        <div class="result-card result-summary-card neon-card">
+        <div class="result-card result-summary-card">
+          {% set tp = result.treatment_plan or result.meta.get('treatment_plan') or {} %}
+          <div class="innovation-tags">
+            {% for tag in tp.get('innovation_tags', ['AI 多任务诊断']) %}
+            <span class="inno-tag">{{ tag }}</span>
+            {% endfor %}
+          </div>
+
           <div class="risk-meter-wrap">
             <div class="meter" id="disease_meter" data-percent="{{ '%.0f'|format(result.meta.disease_risk_percent) }}">
               <div class="meter-fill">
@@ -270,53 +515,238 @@
                 </div>
               </div>
             </div>
-            <div class="result-highlight">严重程度：<strong>{{ result.meta.severity }}</strong></div>
-          </div>
-
-          <div class="summary-block">
-            <h3>评估摘要</h3>
-            <div class="summary">{{ result.summary }}</div>
-          </div>
-
-          <div class="prob-block">
-            <h3>严重程度概率</h3>
-            <div class="probs">
-              {% for name, value in result.probabilities.items() %}
-              <div class="prob">
-                <span>{{ name }}</span>
-                <strong>{{ '%.1f%%'|format(value * 100) }}</strong>
-              </div>
-              <div class="progress-bar"><span style="width: {{ '%.0f'|format(value * 100) }}%;"></span></div>
-              {% endfor %}
+            <div class="result-badges">
+              <div class="result-highlight">严重程度：<strong>{{ result.meta.severity }}</strong></div>
+              <div class="result-highlight urgency-{{ tp.get('urgency', '中') }}">紧急程度：<strong>{{ tp.get('urgency', '中') }}</strong></div>
+              <div class="result-highlight">作物类型：<strong>{{ tp.get('crop', result.meta.get('crop', '-')) }}</strong></div>
             </div>
           </div>
 
-          <div class="meta-block">
-            <h3>运行信息</h3>
-            <div class="meta-line compact">
-                设备：{{ result.meta.device }}<br>
-                {% set _conf = (result.meta.get('severity_confidence') if result.meta else None) %}
-                {% if _conf is none %}
-                  {% set _conf = (result.meta.get('confidence') if result.meta else None) %}
-                {% endif %}
-                {% if _conf is none %}
-                  {% set _conf = 0.95 %}
-                {% endif %}
-                置信度：{{ '%.2f'|format(_conf * 100) }}%<br>
-                模型权重：<code>best_multitask_model.pth</code>
+          {% if result.meta.get('disease_std') %}
+          <div class="uncertainty-banner">
+            <span class="uncertainty-icon" aria-hidden="true"></span>
+            <span>不确定性分析：风险标准差 {{ result.meta.disease_std }}%
+            {% if tp.get('uncertainty_note') %} · {{ tp.uncertainty_note }}{% endif %}</span>
+          </div>
+          {% endif %}
+
+          {% if tp.get('actionable_summary') or tp.get('quick_suggestion') %}
+          <div class="actionable-banner result-subsection">
+            <h3 class="result-subsection-title">田间执行建议</h3>
+            <p class="actionable-text">{{ tp.get('actionable_summary') or tp.get('quick_suggestion') }}</p>
+          </div>
+          {% endif %}
+
+          <div class="summary-block result-subsection">
+            <h3 class="result-subsection-title">评估摘要</h3>
+            <div class="summary">{{ result.summary }}</div>
+          </div>
+
+          <div class="prob-block result-subsection">
+            <h3 class="result-subsection-title">严重程度概率</h3>
+            <div class="prob-viz-row">
+              <div id="result_prob_chart" class="echart-panel echart-panel-sm result-prob-chart" role="img" aria-label="严重程度概率图"></div>
+              <div class="probs">
+                {% for name, value in result.probabilities.items() %}
+                <div class="prob">
+                  <span>{{ name }}</span>
+                  <strong>{{ '%.1f%%'|format(value * 100) }}</strong>
+                </div>
+                <div class="progress-bar"><span style="width: {{ '%.0f'|format(value * 100) }}%;"></span></div>
+                {% endfor %}
               </div>
+            </div>
+          </div>
+
+          <div class="meta-block result-subsection">
+            <h3 class="result-subsection-title">运行信息</h3>
+            <dl class="meta-dl">
+              <div class="meta-dl-row">
+                <dt>设备</dt>
+                <dd>{{ result.meta.device }}</dd>
+              </div>
+              {% set _conf = (result.meta.get('severity_confidence') if result.meta else None) %}
+              {% if _conf is none %}
+                {% set _conf = (result.meta.get('confidence') if result.meta else None) %}
+              {% endif %}
+              {% if _conf is none %}
+                {% set _conf = 0.95 %}
+              {% endif %}
+              <div class="meta-dl-row">
+                <dt>置信度</dt>
+                <dd>{{ '%.2f'|format(_conf * 100) }}%</dd>
+              </div>
+              <div class="meta-dl-row">
+                <dt>预计成本</dt>
+                <dd>{{ tp.get('estimated_cost', '-') }}</dd>
+              </div>
+              <div class="meta-dl-row">
+                <dt>周期</dt>
+                <dd>{{ tp.get('treatment_duration', '-') }}</dd>
+              </div>
+            </dl>
+            {% if result.report_json or result.report_pdf %}
+            <div class="report-links">
+              {% if result.report_json %}<a href="{{ result.report_json }}" class="report-link-chip">JSON 报告</a>{% endif %}
+              {% if result.report_pdf %}<a href="{{ result.report_pdf }}" class="report-link-chip">PDF 报告</a>{% endif %}
+            </div>
+            {% endif %}
           </div>
         </div>
       </div>
+
+      {% if tp %}
+      <div class="treatment-panel" id="treatment_section">
+        <div class="treatment-panel-top">
+          <div class="section-head treatment-section-head">
+            <div>
+              <h2>详细防治方案</h2>
+              <p>基于识别结果与严重程度，生成分步路线图与复查计划。</p>
+            </div>
+            <span class="section-badge">Treatment</span>
+          </div>
+          <div class="treatment-meta-row">
+            <span class="treatment-chip chip-urgency urgency-{{ tp.get('urgency', '中') }}">紧急程度 · {{ tp.get('urgency', '中') }}</span>
+            <span class="treatment-chip">预计成本 · {{ tp.get('estimated_cost', '-') }}</span>
+            <span class="treatment-chip">周期 · {{ tp.get('treatment_duration', '-') }}</span>
+            {% if tp.get('crop') %}<span class="treatment-chip chip-crop">{{ tp.get('crop') }}</span>{% endif %}
+          </div>
+        </div>
+
+        <div class="treatment-grid">
+          <div class="treatment-card card-symptom">
+            <h3><span class="treatment-card-label">01</span>症状识别</h3>
+            <ul class="treatment-list">
+              {% for s in tp.get('symptoms', []) %}<li>{{ s }}</li>{% endfor %}
+            </ul>
+          </div>
+          <div class="treatment-card card-cause">
+            <h3><span class="treatment-card-label">02</span>发病原因</h3>
+            <ul class="treatment-list">
+              {% for c in tp.get('causes', []) %}<li>{{ c }}</li>{% endfor %}
+            </ul>
+          </div>
+          <div class="treatment-card card-prevent">
+            <h3><span class="treatment-card-label">03</span>预防措施</h3>
+            <ul class="treatment-list">
+              {% for p in tp.get('prevention', []) %}<li>{{ p }}</li>{% endfor %}
+            </ul>
+          </div>
+        </div>
+
+        <div class="treatment-grid two-col">
+          <div class="treatment-card highlight-chemical">
+            <h3><span class="treatment-card-label chemical">化</span>化学防治</h3>
+            <ul class="treatment-list">
+              {% for c in tp.get('chemical_treatment', []) %}<li>{{ c }}</li>{% endfor %}
+            </ul>
+            {% if tp.get('phytosanitary_notice') %}
+            <p class="phytosanitary-notice">{{ tp.phytosanitary_notice }}</p>
+            {% endif %}
+          </div>
+          <div class="treatment-card highlight-organic">
+            <h3><span class="treatment-card-label organic">绿</span>绿色 / 有机防治</h3>
+            <ul class="treatment-list">
+              {% for o in tp.get('organic_treatment', []) %}<li>{{ o }}</li>{% endfor %}
+            </ul>
+          </div>
+        </div>
+
+        <div class="treatment-roadmap">
+          <h3 class="treatment-block-title">分步防治路线图</h3>
+          <div class="roadmap-steps">
+            {% for step in tp.get('treatment_steps', []) %}
+            <div class="roadmap-step">
+              <div class="step-phase">{{ step.phase }}</div>
+              <div class="step-action">{{ step.action }}</div>
+              <div class="step-timing">{{ step.timing }}</div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="recheck-timeline">
+          <h3 class="treatment-block-title">智能复查时间线</h3>
+          <div class="timeline-track">
+            {% for item in tp.get('recheck_timeline', []) %}
+            <div class="timeline-item priority-{{ item.priority }}">
+              <div class="timeline-day">第 {{ item.day }} 天</div>
+              <div class="timeline-label">{{ item.label }}</div>
+              <div class="timeline-action">{{ item.action }}</div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        {% if tp.get('season_tips') %}
+        <div class="season-tip">
+          <strong>季节性提示</strong>
+          <p>{{ tp.season_tips }}</p>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
     </section>
     {% endif %}
 
     {% if error %}
     <div class="error mt-4 glass-error">{{ error }}</div>
     {% endif %}
+
+    <!-- ===== 病害列表弹窗 Modal ===== -->
+    <div id="disease_modal_overlay" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="disease_modal_title">
+      <div class="modal-container modal-container-disease">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <h2 id="disease_modal_title">可识别病害库</h2>
+            <p class="modal-subtitle">搜索名称，查看症状、防治与用药建议</p>
+          </div>
+          <button type="button" class="modal-close" id="modal_close_btn" aria-label="关闭">&times;</button>
+        </div>
+        <div class="modal-search-bar">
+          <span class="modal-search-icon" aria-hidden="true"></span>
+          <input type="search" id="disease_search_input" class="modal-search-input" placeholder="搜索病害名称或症状关键词…" autocomplete="off">
+        </div>
+        <div class="modal-crop-filter" id="disease_crop_filter" role="group" aria-label="按作物筛选"></div>
+        <div class="modal-body modal-body-scroll" id="disease_modal_body">
+          <div class="modal-empty">
+            <span class="modal-empty-icon" aria-hidden="true"></span>
+            <p>输入关键词筛选，或浏览全部病害条目</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <span id="disease_count_display" class="modal-footer-meta">共 0 种病害</span>
+          <button type="button" class="btn btn-outline-secondary btn-3d" id="modal_close_btn2">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 详情弹窗 ===== -->
+    <div id="detail_modal_overlay" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="detail_modal_title">
+      <div class="modal-container modal-container-wide">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <h2 id="detail_modal_title">详情</h2>
+          </div>
+          <button type="button" class="modal-close" id="detail_modal_close" aria-label="关闭">&times;</button>
+        </div>
+        <div class="modal-body modal-body-scroll" id="detail_modal_body"></div>
+        <div class="modal-footer modal-footer-actions">
+          <span id="detail_modal_footer" class="modal-footer-meta"></span>
+          <div class="modal-footer-btns">
+            <button class="btn btn-primary btn-3d" type="button" id="detail_modal_action" style="display:none;"></button>
+            <button class="btn btn-outline-secondary btn-3d" type="button" id="detail_modal_close2">关闭</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="site-footer">© 智农 · 农作物病虫害AI智能识别预警系统</footer>
+
   </main>
 </div>
-<script>window.__chartData = {{ chart_data|default('null')|safe }};</script>
+
+<script>window.__chartData = {{ chart_data|default('null')|safe }}; if (window.__chartData && window.__chartData.labels) { window.__chartData.labels = (window.__chartData.labels || []).map(function(l, i) { var s = String(l||''); var m = s.match(/(\d{4})(\d{2})(\d{2})/); if (m) return parseInt(m[2],10)+'/'+parseInt(m[3],10); if (/T\d{6}Z/i.test(s)||s.length>10) return '诊断'+(i+1); return s; }); }</script>
 <script>
 (function() {
   const form = document.getElementById('upload_form');
@@ -349,7 +779,8 @@
     setPredictLocked(false);
   }
 
-  function clearPreview(lock = true) {
+  function clearPreview(lock) {
+    if (lock === undefined) lock = true;
     if (previewField) previewField.value = '';
     if (previewImg) previewImg.removeAttribute('src');
     if (previewCard) previewCard.style.display = 'none';
@@ -358,27 +789,161 @@
     if (lock) setPredictLocked(true);
   }
 
-  if (fileInput) {
-    fileInput.addEventListener('change', function() {
-      const file = fileInput.files && fileInput.files[0];
-      if (!file) {
-        clearPreview();
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = function() {
-        setPreview(reader.result, '本地缩略图已生成，评估按钮已解锁');
-      };
-      reader.readAsDataURL(file);
-      if (urlInput && urlInput.value.trim()) urlInput.value = '';
+  const previewTokenField = document.getElementById('preview_token');
+  const previewShell = document.querySelector('.preview-shell');
+  const previewAjaxBtn = document.getElementById('preview_ajax_btn');
+  const quickPredictToggle = document.getElementById('quick_predict_toggle');
+  let submitMode = 'file';
+  const QUICK_MODE_KEY = 'zhinong_quick_preview';
+
+  if (quickPredictToggle) {
+    try {
+      quickPredictToggle.checked = localStorage.getItem(QUICK_MODE_KEY) === '1';
+    } catch (e) {}
+    quickPredictToggle.addEventListener('change', function() {
+      try {
+        localStorage.setItem(QUICK_MODE_KEY, quickPredictToggle.checked ? '1' : '0');
+      } catch (e) {}
     });
   }
 
+  function getActiveSubmitMode() {
+    const active = document.querySelector('.submit-mode-tab.active');
+    return active ? active.getAttribute('data-mode') : submitMode;
+  }
+
+  async function runAjaxPreview() {
+    const mode = getActiveSubmitMode();
+    const fd = new FormData();
+    const file = fileInput && fileInput.files && fileInput.files[0];
+    const urlVal = urlInput && urlInput.value.trim();
+    if (mode === 'url') {
+      if (!urlVal) {
+        if (previewStatus) previewStatus.textContent = '请先填写公网图片 URL';
+        return false;
+      }
+      fd.append('image_url', urlVal);
+    } else if (mode === 'file') {
+      if (!file) {
+        if (previewStatus) previewStatus.textContent = '请先选择本地图片';
+        return false;
+      }
+      fd.append('image', file);
+    } else {
+      if (previewStatus) previewStatus.textContent = '批量模式请使用「批量预测」';
+      return false;
+    }
+    if (previewShell) previewShell.classList.add('is-scanning');
+    if (previewStatus) previewStatus.textContent = '正在生成预览…';
+    try {
+      const resp = await fetch('/api/preview', { method: 'POST', body: fd });
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || '预览失败');
+      const src = 'data:image/png;base64,' + data.preview_b64;
+      setPreview(src, '预览已就绪 · ' + (data.width || '') + '×' + (data.height || '') + ' px');
+      if (previewTokenField) previewTokenField.value = data.preview_token || '';
+      if (previewField) previewField.value = data.preview_b64;
+      return true;
+    } catch (e) {
+      if (previewStatus) previewStatus.textContent = '预览失败：' + e.message;
+      return false;
+    } finally {
+      if (previewShell) previewShell.classList.remove('is-scanning');
+    }
+  }
+
+  if (previewAjaxBtn) {
+    previewAjaxBtn.addEventListener('click', function() { runAjaxPreview(); });
+  }
+
+  const urlPreviewPredictBtn = document.getElementById('url_preview_predict_btn');
+  if (urlPreviewPredictBtn && form) {
+    urlPreviewPredictBtn.addEventListener('click', async function() {
+      const ok = await runAjaxPreview();
+      if (!ok) return;
+      if (predictBtn) {
+        predictBtn.disabled = false;
+        predictBtn.click();
+      } else {
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'action';
+        hidden.value = 'predict';
+        form.appendChild(hidden);
+        form.submit();
+      }
+    });
+  }
+
+  function applySubmitModeUI(mode) {
+    submitMode = mode;
+    const pf = document.getElementById('panel_file');
+    const pu = document.getElementById('panel_url');
+    const pb = document.getElementById('panel_batch');
+    if (pf) pf.hidden = mode !== 'file';
+    if (pu) pu.hidden = mode !== 'url';
+    if (pb) pb.hidden = mode !== 'batch';
+    const adv = document.querySelector('.advanced-options');
+    const optLabel = document.querySelector('.upload-options-label');
+    const previewSubmit = document.getElementById('preview_submit_btn');
+    const isBatch = mode === 'batch';
+    if (adv) adv.style.display = isBatch ? 'none' : '';
+    if (optLabel) optLabel.style.display = isBatch ? 'none' : '';
+    if (previewAjaxBtn) previewAjaxBtn.style.display = isBatch ? 'none' : '';
+    if (previewSubmit) previewSubmit.style.display = isBatch ? 'none' : 'none';
+    if (predictBtn) predictBtn.style.display = isBatch ? 'none' : '';
+    const batchBtn = document.getElementById('batch_predict_btn');
+    if (batchBtn) batchBtn.style.display = isBatch ? '' : 'none';
+    if (urlPreviewPredictBtn) urlPreviewPredictBtn.style.display = mode === 'url' ? '' : 'none';
+  }
+
+  document.querySelectorAll('.submit-mode-tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      const mode = tab.getAttribute('data-mode');
+      document.querySelectorAll('.submit-mode-tab').forEach(function(t) {
+        t.classList.toggle('active', t === tab);
+        t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+      });
+      applySubmitModeUI(mode);
+    });
+  });
+  applySubmitModeUI('file');
+
+  if (fileInput) {
+    fileInput.addEventListener('change', async function() {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) { clearPreview(); return; }
+      if (urlInput && urlInput.value.trim()) urlInput.value = '';
+      if (quickPredictToggle && quickPredictToggle.checked) {
+        await runAjaxPreview();
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function() { setPreview(reader.result, '本地缩略图已生成（建议点「生成预览」同步服务端）'); };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  document.addEventListener('paste', function(ev) {
+    const items = ev.clipboardData && ev.clipboardData.items;
+    if (!items || !fileInput) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const blob = items[i].getAsFile();
+        if (!blob) continue;
+        const dt = new DataTransfer();
+        dt.items.add(new File([blob], 'paste.png', { type: blob.type }));
+        fileInput.files = dt.files;
+        fileInput.dispatchEvent(new Event('change'));
+        ev.preventDefault();
+        break;
+      }
+    }
+  });
+
   if (urlInput) {
     urlInput.addEventListener('input', function() {
-      if (urlInput.value.trim()) {
-        clearPreview();
-      }
+      if (urlInput.value.trim()) clearPreview();
     });
   }
 
@@ -403,99 +968,671 @@
   }
 
   function buildMeterGradient(value) {
-    const greenEnd = 40;
-    const warnEnd = 70;
+    const greenEnd = 40, warnEnd = 70;
     const clamped = Math.max(0, Math.min(100, value));
     const greenDeg = Math.min(clamped, greenEnd) * 3.6;
     const warnDeg = Math.min(clamped, warnEnd) * 3.6;
     const endDeg = clamped * 3.6;
-    return `conic-gradient(from -90deg, #22c55e 0deg ${greenDeg}deg, #f59e0b ${greenDeg}deg ${warnDeg}deg, #ef4444 ${warnDeg}deg ${endDeg}deg, rgba(255,255,255,0.08) ${endDeg}deg 360deg)`;
+    return 'conic-gradient(from -90deg, #22c55e 0deg ' + greenDeg + 'deg, #f59e0b ' + greenDeg + 'deg ' + warnDeg + 'deg, #ef4444 ' + warnDeg + 'deg ' + endDeg + 'deg, rgba(255,255,255,0.08) ' + endDeg + 'deg 360deg)';
   }
 
-  function buildTrendSeries() {
-    if (window.__chartData) return window.__chartData;
-    const severityText = document.querySelector('.result-highlight strong')?.textContent?.trim() || '';
-    const severityRisk = Number((document.querySelector('.meter[data-percent]')?.getAttribute('data-percent')) || 0);
-    const confidenceText = document.querySelector('.meta-line.compact')?.textContent || '';
-    const confidenceMatch = confidenceText.match(/置信度：([\d.]+)%/);
-    const confidence = confidenceMatch ? Number(confidenceMatch[1]) : 95;
-    const severityValue = severityText ? Number(String(severityText).replace(/[^\d.]/g, '')) || 1 : 1;
-    const base = Math.max(35, severityRisk);
+  function shortChartLabel(value, index) {
+    const s = String(value == null ? '' : value);
+    const m = s.match(/(\d{4})(\d{2})(\d{2})/);
+    if (m) return parseInt(m[2], 10) + '/' + parseInt(m[3], 10);
+    if (/^\d{4}日$/.test(s)) return s.replace('日', '');
+    if (/T\d{6}Z/i.test(s) || s.length > 10) return '诊断' + ((index || 0) + 1);
+    return s || ('诊断' + ((index || 0) + 1));
+  }
+
+  function formatChartLabels(rawLabels) {
+    if (!rawLabels || !rawLabels.length) return ['诊断1', '诊断2', '诊断3', '诊断4', '诊断5', '诊断6', '诊断7'];
+    return rawLabels.map(function(lbl, i) { return shortChartLabel(lbl, i); });
+  }
+
+  function sanitizeChartPayload(payload) {
+    if (!payload) return null;
+    const labels = formatChartLabels(payload.labels || []);
     return {
-      labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
-      risk: [base - 8, base - 3, base, base + 5, base + 2, base - 2, base - 6],
-      suggestion: [60, 66, 72, 78, 80, 74, 82],
-      confidence: [confidence - 5, confidence - 2, confidence, confidence + 1, confidence + 2, confidence - 1, confidence - 4],
-      severityValue
+      labels: labels,
+      risk: payload.risk || [],
+      suggestion: payload.suggestion || [],
+      confidence: payload.confidence || []
     };
   }
 
+  function normalizeChartSeries(palette) {
+    const labels = formatChartLabels(palette.labels || []);
+    const n = labels.length;
+    const pad = function(arr, fallback) {
+      const out = (arr || []).slice(0, n).map(function(v) { return Number(v) || 0; });
+      while (out.length < n) out.push(fallback[out.length % fallback.length]);
+      return out;
+    };
+    const riskFb = [52, 58, 82, 65, 52, 15, 12];
+    const suggFb = [65, 68, 72, 70, 62, 60, 58];
+    const confFb = [88, 90, 87, 85, 89, 92, 94];
+    return {
+      labels: labels,
+      risk: pad(palette.risk, riskFb),
+      suggestion: pad(palette.suggestion, suggFb),
+      confidence: pad(palette.confidence, confFb),
+    };
+  }
+
+  function buildTrendSeries() {
+    if (window.__chartData && window.__chartData.labels) {
+      return normalizeChartSeries(sanitizeChartPayload(window.__chartData));
+    }
+    const riskEl = document.querySelector('.meter[data-percent]');
+    const severityRisk = riskEl ? Number(riskEl.getAttribute('data-percent')) || 0 : 50;
+    const confEl = document.querySelector('.meta-line.compact');
+    const confMatch = confEl ? confEl.textContent.match(/置信度：([\d.]+)%/) : null;
+    const confidence = confMatch ? Number(confMatch[1]) : 85;
+    const base = Math.max(35, severityRisk);
+    return normalizeChartSeries({
+      labels: ['诊断1'],
+      risk: [base],
+      suggestion: [Math.min(100, base + 15)],
+      confidence: [confidence]
+    });
+  }
+
+  const trendChartTipEl = document.getElementById('trend_chart_tip');
+
+  function hideTrendTip() {
+    if (trendChartTipEl) {
+      trendChartTipEl.hidden = true;
+      trendChartTipEl.textContent = '';
+    }
+    forceHideEchartsTip();
+  }
+
+  function scrubEchartsHoverLayers() {
+    if (!trendChartEl) return;
+    trendChartEl.querySelectorAll('div').forEach(function(el) {
+      if (el.querySelector('canvas')) return;
+      const text = (el.textContent || '').trim();
+      if (text) return;
+      const bg = window.getComputedStyle(el).backgroundColor;
+      if (bg === 'rgb(255, 255, 255)' || bg === 'rgba(255, 255, 255, 1)') el.remove();
+    });
+    document.querySelectorAll('div').forEach(function(el) {
+      if (el === trendChartTipEl || el.closest('.trend-chart-wrap') || el.closest('#trend_chart')) return;
+      const cn = String(el.className || '');
+      if (cn.indexOf('echarts-tooltip') >= 0) el.remove();
+    });
+  }
+
+  function forceHideEchartsTip() {
+    if (trendChart) {
+      trendChart.dispatchAction({ type: 'hideTip' });
+      trendChart.dispatchAction({ type: 'updateAxisPointer', currTrigger: 'leave' });
+    }
+    scrubEchartsHoverLayers();
+  }
+
+  function showTrendTip(params) {
+    if (!trendChartTipEl || !trendChart || !params) return;
+    if (params.componentType !== 'series' || params.seriesType !== 'line') {
+      hideTrendTip();
+      return;
+    }
+    const idx = params.dataIndex;
+    if (idx == null || idx < 0) { hideTrendTip(); return; }
+    const title = paletteLabelsRef[idx] || ('诊断' + (idx + 1));
+    const val = params.value;
+    if (val == null || !isFinite(val)) { hideTrendTip(); return; }
+    forceHideEchartsTip();
+    trendChartTipEl.innerHTML = '<strong>' + title + '</strong><br>' + params.seriesName + '：' + val;
+    trendChartTipEl.hidden = false;
+    const wrap = trendChartEl && trendChartEl.parentElement;
+    if (!wrap) return;
+    const pt = trendChart.convertToPixel(
+      { seriesIndex: params.seriesIndex },
+      [idx, val]
+    );
+    if (!pt || !isFinite(pt[0]) || !isFinite(pt[1])) return;
+    const x = Math.min(wrap.clientWidth - 168, Math.max(8, pt[0] + 12));
+    const y = Math.max(8, pt[1] - 52);
+    trendChartTipEl.style.left = x + 'px';
+    trendChartTipEl.style.top = y + 'px';
+  }
+
+  let paletteLabelsRef = [];
+
   function initTrendChart() {
     if (!trendChartEl || typeof echarts === 'undefined') return;
-    trendChart = echarts.init(trendChartEl, null, { renderer: 'canvas' });
+    hideTrendTip();
+    if (trendChart) {
+      trendChart.off('mouseover');
+      trendChart.off('globalout');
+      trendChart.dispose();
+      trendChart = null;
+    }
     const palette = buildTrendSeries();
+    if (!palette.labels.length) {
+      trendChartEl.innerHTML = '<div class="chart-empty">暂无趋势数据，请点击「刷新演示数据」</div>';
+      return;
+    }
+    trendChartEl.innerHTML = '';
+    paletteLabelsRef = palette.labels.slice();
+    trendChart = echarts.init(trendChartEl, null, { renderer: 'canvas' });
+    const labels = paletteLabelsRef;
+    const risk = palette.risk;
+    const suggestion = palette.suggestion;
+    const confidence = palette.confidence;
+    const axisOff = { show: false, label: { show: false }, lineStyle: { opacity: 0 }, shadowStyle: { opacity: 0 } };
+
     trendChart.setOption({
       backgroundColor: 'transparent',
+      axisPointer: axisOff,
       tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'cross' }
+        show: false,
+        showContent: false,
+        triggerOn: 'none',
+        axisPointer: axisOff
       },
-      grid: { left: 42, right: 24, top: 28, bottom: 28 },
+      grid: { left: 44, right: 20, top: 40, bottom: 48 },
       legend: {
         data: ['病害风险', '处理建议', '识别置信度'],
-        textStyle: { color: '#dbe4f1' },
-        top: 0
+        textStyle: { color: '#6b7280' }, top: 4
       },
       xAxis: {
         type: 'category',
-        boundaryGap: false,
-        data: palette.labels,
-        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.18)' } },
-        axisLabel: { color: '#cbd5e1' },
-        splitLine: { show: false }
+        boundaryGap: true,
+        data: labels,
+        axisLine: { lineStyle: { color: '#d1d5db' } },
+        axisLabel: {
+          color: '#6b7280',
+          fontSize: 11,
+          interval: 0,
+          hideOverlap: true,
+          formatter: function(_v, idx) { return labels[idx] || ''; }
+        },
+        splitLine: { show: false },
+        axisPointer: axisOff
       },
       yAxis: {
         type: 'value',
         max: 100,
-        axisLabel: { color: '#cbd5e1' },
-        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } }
+        min: 0,
+        axisLabel: { color: '#6b7280', formatter: '{value}' },
+        splitLine: { lineStyle: { color: '#e5e7eb', type: 'dashed' } },
+        axisPointer: axisOff
       },
       series: [
-        {
-          name: '病害风险',
-          type: 'line',
-          smooth: true,
-          symbol: 'circle',
-          symbolSize: 10,
-          lineStyle: { width: 3, color: '#409eff' },
-          itemStyle: { color: '#409eff' },
-          areaStyle: { color: 'rgba(64, 158, 255, 0.18)' },
-          data: palette.risk
-        },
-        {
-          name: '处理建议',
-          type: 'line',
-          smooth: true,
-          symbol: 'circle',
-          symbolSize: 10,
-          lineStyle: { width: 3, color: '#30b08f' },
-          itemStyle: { color: '#30b08f' },
-          areaStyle: { color: 'rgba(48, 176, 143, 0.14)' },
-          data: palette.suggestion
-        },
-        {
-          name: '识别置信度',
-          type: 'line',
-          smooth: true,
-          symbol: 'circle',
-          symbolSize: 10,
-          lineStyle: { width: 3, color: '#f59e0b' },
-          itemStyle: { color: '#f59e0b' },
-          areaStyle: { color: 'rgba(245, 158, 11, 0.14)' },
-          data: palette.confidence
-        }
+        { name: '病害风险', type: 'line', smooth: true, symbol: 'circle', symbolSize: 8,
+          showSymbol: true, triggerLineEvent: false, silent: false,
+          lineStyle: { width: 2.5, color: '#409eff' }, itemStyle: { color: '#409eff' },
+          areaStyle: { color: 'rgba(64, 158, 255, 0.08)' }, data: risk,
+          emphasis: { disabled: true, focus: 'none', scale: false, label: { show: false } },
+          label: { show: false }, tooltip: { show: false } },
+        { name: '处理建议', type: 'line', smooth: true, symbol: 'circle', symbolSize: 8,
+          showSymbol: true, triggerLineEvent: false, silent: false,
+          lineStyle: { width: 2.5, color: '#30b08f' }, itemStyle: { color: '#30b08f' },
+          areaStyle: { color: 'rgba(48, 176, 143, 0.06)' }, data: suggestion,
+          emphasis: { disabled: true, focus: 'none', scale: false, label: { show: false } },
+          label: { show: false }, tooltip: { show: false } },
+        { name: '识别置信度', type: 'line', smooth: true, symbol: 'circle', symbolSize: 8,
+          showSymbol: true, triggerLineEvent: false, silent: false,
+          lineStyle: { width: 2.5, color: '#f59e0b' }, itemStyle: { color: '#f59e0b' },
+          areaStyle: { color: 'rgba(245, 158, 11, 0.06)' }, data: confidence,
+          emphasis: { disabled: true, focus: 'none', scale: false, label: { show: false } },
+          label: { show: false }, tooltip: { show: false } }
       ]
+    }, { notMerge: true });
+
+    const zr = trendChart.getZr();
+    zr.on('mousemove', scrubEchartsHoverLayers);
+    trendChart.on('mousemove', function(params) {
+      forceHideEchartsTip();
+      if (params && params.componentType === 'series' && params.seriesType === 'line' && params.dataIndex != null) {
+        showTrendTip(params);
+      } else if (trendChartTipEl) {
+        trendChartTipEl.hidden = true;
+        trendChartTipEl.textContent = '';
+      }
     });
+    trendChart.on('globalout', hideTrendTip);
+    requestAnimationFrame(function() { if (trendChart) trendChart.resize(); });
+  }
+
+  const VIZ_COLORS = {
+    green: '#15803d',
+    greenLight: '#22c55e',
+    blue: '#2563eb',
+    gold: '#d97706',
+    red: '#dc2626',
+    slate: '#57534e',
+    pie: ['#15803d', '#d97706', '#dc2626', '#2563eb', '#0d9488', '#a16207', '#78716c']
+  };
+
+  const vizChartInstances = {};
+
+  function disposeVizChart(id) {
+    if (vizChartInstances[id]) {
+      vizChartInstances[id].dispose();
+      delete vizChartInstances[id];
+    }
+  }
+
+  function initEchartOn(elId, option, height) {
+    if (typeof echarts === 'undefined') return null;
+    const el = document.getElementById(elId);
+    if (!el) return null;
+    disposeVizChart(elId);
+    el.innerHTML = '';
+    if (height) el.style.height = height + 'px';
+    const ch = echarts.init(el, null, { renderer: 'canvas' });
+    ch.setOption(option);
+    vizChartInstances[elId] = ch;
+    return ch;
+  }
+
+  function vizTooltipOff() {
+    return { show: true, trigger: 'item', confine: true, backgroundColor: 'rgba(28, 25, 23, 0.92)', borderWidth: 0, textStyle: { color: '#fafaf9', fontSize: 12 } };
+  }
+
+  function updateVizSummaryChips(viz) {
+    if (!viz) return;
+    const rc = document.getElementById('viz_report_count');
+    const ar = document.getElementById('viz_avg_risk');
+    const ac = document.getElementById('viz_avg_conf');
+    const hr = document.getElementById('viz_high_risk');
+    const sum = viz.summary || {};
+    if (rc) rc.textContent = String(viz.report_count != null ? viz.report_count : '--');
+    if (ar) ar.textContent = sum.avg_risk != null ? sum.avg_risk + '%' : '--';
+    if (ac) ac.textContent = sum.avg_confidence != null ? sum.avg_confidence + '%' : '--';
+    if (hr) hr.textContent = sum.high_risk_count != null ? String(sum.high_risk_count) : '--';
+  }
+
+  function renderVisualizationCharts(viz) {
+    if (!viz || typeof echarts === 'undefined') return;
+    updateVizSummaryChips(viz);
+
+    const sev = viz.severity_pie || [];
+    initEchartOn('chart_severity_pie', {
+      color: [VIZ_COLORS.greenLight, VIZ_COLORS.gold, VIZ_COLORS.red],
+      tooltip: vizTooltipOff(),
+      series: [{
+        type: 'pie', radius: ['42%', '68%'], center: ['50%', '52%'],
+        data: sev, label: { fontSize: 11, color: VIZ_COLORS.slate },
+        itemStyle: { borderColor: '#fff', borderWidth: 2 }
+      }]
+    });
+
+    const risk = viz.risk_distribution || {};
+    initEchartOn('chart_risk_bar', {
+      tooltip: { ...vizTooltipOff(), trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { left: 12, right: 16, top: 24, bottom: 28, containLabel: true },
+      xAxis: { type: 'category', data: risk.labels || [], axisLabel: { fontSize: 10, color: VIZ_COLORS.slate, interval: 0 } },
+      yAxis: { type: 'value', minInterval: 1, axisLabel: { color: VIZ_COLORS.slate } },
+      series: [{
+        type: 'bar', data: risk.values || [], barMaxWidth: 36,
+        itemStyle: {
+          color: function(p) {
+            const i = p.dataIndex;
+            return i === 0 ? VIZ_COLORS.green : (i === 1 ? VIZ_COLORS.gold : VIZ_COLORS.red);
+          },
+          borderRadius: [6, 6, 0, 0]
+        }
+      }]
+    });
+
+    const top = (viz.disease_top || []).slice().reverse();
+    initEchartOn('chart_disease_top', {
+      tooltip: { ...vizTooltipOff(), trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { left: 8, right: 24, top: 8, bottom: 8, containLabel: true },
+      xAxis: { type: 'value', axisLabel: { color: VIZ_COLORS.slate } },
+      yAxis: { type: 'category', data: top.map(function(d) { return d.name; }), axisLabel: { fontSize: 11, color: VIZ_COLORS.slate } },
+      series: [{ type: 'bar', data: top.map(function(d) { return d.value; }), itemStyle: { color: VIZ_COLORS.blue, borderRadius: [0, 6, 6, 0] } }]
+    }, 240);
+
+    const crops = viz.crop_distribution || [];
+    initEchartOn('chart_crop_pie', {
+      color: VIZ_COLORS.pie,
+      tooltip: vizTooltipOff(),
+      series: [{
+        type: 'pie', radius: '62%', center: ['50%', '52%'],
+        data: crops, label: { fontSize: 10, formatter: '{b}' },
+        itemStyle: { borderColor: '#fff', borderWidth: 2 }
+      }]
+    });
+
+    const urg = viz.urgency_pie || [];
+    initEchartOn('chart_urgency_pie', {
+      color: [VIZ_COLORS.green, VIZ_COLORS.gold, VIZ_COLORS.red, VIZ_COLORS.blue],
+      tooltip: vizTooltipOff(),
+      series: [{
+        type: 'pie', radius: ['36%', '64%'], roseType: 'radius',
+        data: urg, label: { fontSize: 11 }
+      }]
+    });
+
+    const act = viz.diagnosis_activity || {};
+    initEchartOn('chart_activity_bar', {
+      tooltip: { ...vizTooltipOff(), trigger: 'axis' },
+      grid: { left: 12, right: 12, top: 16, bottom: 28, containLabel: true },
+      xAxis: { type: 'category', data: act.labels || [], axisLabel: { fontSize: 10, color: VIZ_COLORS.slate } },
+      yAxis: { type: 'value', minInterval: 1, axisLabel: { color: VIZ_COLORS.slate } },
+      series: [{
+        type: 'bar', data: act.values || [], itemStyle: { color: VIZ_COLORS.green, borderRadius: [4, 4, 0, 0] }
+      }]
+    });
+
+    const scatter = viz.confidence_risk_scatter || [];
+    const sevColor = { '健康': VIZ_COLORS.greenLight, '一般': VIZ_COLORS.gold, '严重': VIZ_COLORS.red };
+    initEchartOn('chart_scatter', {
+      tooltip: {
+        trigger: 'item',
+        confine: true,
+        formatter: function(p) {
+          const d = p.data;
+          return (d.name || '诊断') + '<br>风险 ' + d[0] + '% · 置信度 ' + d[1] + '%';
+        }
+      },
+      grid: { left: 44, right: 16, top: 16, bottom: 36 },
+      xAxis: { name: '风险%', max: 100, min: 0, axisLabel: { color: VIZ_COLORS.slate } },
+      yAxis: { name: '置信度%', max: 100, min: 0, axisLabel: { color: VIZ_COLORS.slate } },
+      series: [{
+        type: 'scatter', symbolSize: 10,
+        data: scatter.map(function(s) {
+          return {
+            value: [s.risk, s.confidence],
+            name: s.name,
+            itemStyle: { color: sevColor[s.severity] || VIZ_COLORS.blue }
+          };
+        })
+      }]
+    });
+  }
+
+  function initResultProbChart() {
+    const el = document.getElementById('result_prob_chart');
+    if (!el || typeof echarts === 'undefined') return;
+    const probs = {};
+    document.querySelectorAll('.probs .prob').forEach(function(row) {
+      const k = row.querySelector('span');
+      const v = row.querySelector('strong');
+      if (!k || !v) return;
+      const pct = parseFloat(String(v.textContent).replace('%', ''));
+      if (!isNaN(pct)) probs[k.textContent.trim()] = pct;
+    });
+    const names = Object.keys(probs);
+    if (!names.length) return;
+    const colors = { '健康': VIZ_COLORS.greenLight, '一般': VIZ_COLORS.gold, '严重': VIZ_COLORS.red };
+    initEchartOn('result_prob_chart', {
+      color: names.map(function(n) { return colors[n] || VIZ_COLORS.blue; }),
+      tooltip: vizTooltipOff(),
+      series: [{
+        type: 'pie', radius: ['48%', '72%'], center: ['50%', '50%'],
+        data: names.map(function(n) { return { name: n, value: probs[n] }; }),
+        label: { formatter: '{b}\n{d}%', fontSize: 11 }
+      }]
+    }, 200);
+  }
+
+  const batchChartInstances = {};
+  const VIZ_FILTER_KEY = 'zhinong_viz_filters';
+
+  function getVizFilterParams() {
+    const daysEl = document.getElementById('viz_filter_days');
+    const srcEl = document.getElementById('viz_filter_source');
+    let days = (daysEl && daysEl.value) || 'all';
+    let source = (srcEl && srcEl.value) || 'all';
+    try {
+      const saved = JSON.parse(localStorage.getItem(VIZ_FILTER_KEY) || '{}');
+      if (daysEl && saved.days) daysEl.value = saved.days;
+      if (srcEl && saved.source) srcEl.value = saved.source;
+      days = (daysEl && daysEl.value) || days;
+      source = (srcEl && srcEl.value) || source;
+    } catch (e) {}
+    return { days: days, source: source };
+  }
+
+  function persistVizFilters() {
+    const p = getVizFilterParams();
+    try {
+      localStorage.setItem(VIZ_FILTER_KEY, JSON.stringify({ days: p.days, source: p.source }));
+    } catch (e) {}
+  }
+
+  function updateVizFilterHint(stats) {
+    const hint = document.getElementById('viz_filter_hint');
+    if (!hint) return;
+    const n = stats && stats.filtered_report_count != null ? stats.filtered_report_count : (stats && stats.visualization && stats.visualization.report_count);
+    const src = stats && stats.filter_source ? stats.filter_source : 'all';
+    const days = stats && stats.filter_days != null ? stats.filter_days : 'all';
+    const srcLabel = { all: '全部来源', real: '仅真实识别', demo: '仅演示' }[src] || src;
+    const dayLabel = days === null || days === 'all' ? '全部时间' : ('近 ' + days + ' 天');
+    if (n === 0 && src !== 'all') {
+      hint.textContent = '当前筛选（' + dayLabel + ' · ' + srcLabel + '）下无报告，图表为空。可切换为「全部」或点击「刷新演示数据」。';
+      hint.hidden = false;
+    } else if (n === 0) {
+      hint.textContent = '暂无诊断报告，请上传识别或刷新演示数据。';
+      hint.hidden = false;
+    } else {
+      hint.textContent = '已加载 ' + n + ' 条报告 · ' + dayLabel + ' · ' + srcLabel;
+      hint.hidden = false;
+    }
+  }
+
+  function disposeBatchChart(id) {
+    if (batchChartInstances[id]) {
+      batchChartInstances[id].dispose();
+      delete batchChartInstances[id];
+    }
+  }
+
+  function initBatchEchart(elId, option, height) {
+    disposeBatchChart(elId);
+    const ch = initEchartOn(elId, option, height);
+    if (ch) {
+      batchChartInstances[elId] = ch;
+      delete vizChartInstances[elId];
+    }
+    return ch;
+  }
+
+  function renderBatchVisualizationCharts(bv) {
+    if (!bv || typeof echarts === 'undefined') return;
+
+    initBatchEchart('batch_chart_outcome', {
+      color: [VIZ_COLORS.greenLight, VIZ_COLORS.red],
+      tooltip: vizTooltipOff(),
+      series: [{ type: 'pie', radius: ['40%', '65%'], data: bv.outcome_pie || [] }]
+    });
+
+    const risk = bv.risk_distribution || {};
+    initBatchEchart('batch_chart_risk', {
+      tooltip: Object.assign({}, vizTooltipOff(), { trigger: 'axis' }),
+      grid: { left: 8, right: 8, top: 16, bottom: 28, containLabel: true },
+      xAxis: { type: 'category', data: risk.labels || [], axisLabel: { fontSize: 9 } },
+      yAxis: { type: 'value', minInterval: 1 },
+      series: [{ type: 'bar', data: risk.values || [], itemStyle: { color: VIZ_COLORS.blue, borderRadius: [4, 4, 0, 0] } }]
+    });
+
+    const top = (bv.disease_top || []).slice().reverse();
+    initBatchEchart('batch_chart_disease', {
+      tooltip: Object.assign({}, vizTooltipOff(), { trigger: 'axis' }),
+      grid: { left: 4, right: 12, top: 8, bottom: 8, containLabel: true },
+      xAxis: { type: 'value' },
+      yAxis: { type: 'category', data: top.map(function(d) { return d.name; }), axisLabel: { fontSize: 10 } },
+      series: [{ type: 'bar', data: top.map(function(d) { return d.value; }), itemStyle: { color: VIZ_COLORS.green } }]
+    }, 200);
+
+    initBatchEchart('batch_chart_severity', {
+      color: [VIZ_COLORS.greenLight, VIZ_COLORS.gold, VIZ_COLORS.red],
+      tooltip: vizTooltipOff(),
+      series: [{ type: 'pie', radius: '58%', data: bv.severity_pie || [] }]
+    });
+  }
+
+  let lastBatchExportPayload = null;
+
+  function csvEscapeCell(v) {
+    const s = String(v == null ? '' : v);
+    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+
+  function downloadBatchCsv(items) {
+    if (!items || !items.length) {
+      alert('无批量结果可导出');
+      return;
+    }
+    const headers = ['filename', 'status', 'disease_name', 'crop', 'severity', 'risk_score', 'confidence', 'urgency', 'error'];
+    const rows = items.map(function(it) {
+      const ok = !it.error;
+      return [
+        it.filename || '',
+        ok ? 'success' : 'fail',
+        it.disease_name || '',
+        it.crop || '',
+        it.severity || '',
+        it.risk_score != null ? it.risk_score : '',
+        it.confidence != null ? it.confidence : '',
+        it.urgency || '',
+        it.error || '',
+      ].map(csvEscapeCell).join(',');
+    });
+    const bom = '\ufeff';
+    const blob = new Blob([bom + headers.join(',') + '\n' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'zhinong_batch_' + Date.now() + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadBatchJson(payload) {
+    if (!payload) {
+      alert('无批量结果可导出');
+      return;
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'zhinong_batch_' + Date.now() + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportBatchChartsPng() {
+    const ids = ['batch_chart_outcome', 'batch_chart_risk', 'batch_chart_disease', 'batch_chart_severity'];
+    const urls = [];
+    ids.forEach(function(id) {
+      const ch = batchChartInstances[id];
+      if (ch) {
+        try {
+          urls.push({ name: id.replace('batch_chart_', ''), url: ch.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fafaf9' }) });
+        } catch (e) {}
+      }
+    });
+    if (!urls.length) {
+      alert('请先完成批量识别并等待图表渲染');
+      return;
+    }
+    urls.forEach(function(item, i) {
+      const a = document.createElement('a');
+      a.href = item.url;
+      a.download = 'zhinong_batch_' + item.name + '_' + Date.now() + (urls.length > 1 ? '_' + (i + 1) : '') + '.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    });
+    if (urls.length > 1) alert('已下载 ' + urls.length + ' 张批量图表 PNG');
+  }
+
+  function renderBatchVizSection(bv, extraMeta) {
+    if (!bv) return '';
+    const avg = bv.avg_risk != null ? ('均风险 ' + bv.avg_risk + '%') : '';
+    const meta = extraMeta || '';
+    return '<div class="batch-viz-panel glass-panel">'
+      + '<div class="batch-viz-head batch-viz-head-row"><div><h3>本次批量 · 数据可视化</h3><p>'
+      + '成功 ' + (bv.success_count || 0) + ' · 失败 ' + (bv.fail_count || 0)
+      + (avg ? ' · ' + avg : '') + (meta ? ' · ' + meta : '') + '</p></div>'
+      + '<div class="batch-export-btns">'
+      + '<button type="button" class="btn btn-outline-primary btn-3d btn-sm" id="batch_export_csv">导出 CSV</button>'
+      + '<button type="button" class="btn btn-outline-primary btn-3d btn-sm" id="batch_export_json">导出 JSON</button>'
+      + '<button type="button" class="btn btn-primary btn-3d btn-sm" id="batch_export_png">导出图表 PNG</button>'
+      + '</div></div>'
+      + '<div class="batch-viz-grid">'
+      + '<div class="batch-viz-chart"><div class="viz-chart-title-sm">成功 / 失败</div><div id="batch_chart_outcome" class="echart-panel echart-panel-batch"></div></div>'
+      + '<div class="batch-viz-chart"><div class="viz-chart-title-sm">风险区间</div><div id="batch_chart_risk" class="echart-panel echart-panel-batch"></div></div>'
+      + '<div class="batch-viz-chart batch-viz-wide"><div class="viz-chart-title-sm">病种 Top</div><div id="batch_chart_disease" class="echart-panel echart-panel-batch-tall"></div></div>'
+      + '<div class="batch-viz-chart"><div class="viz-chart-title-sm">严重程度</div><div id="batch_chart_severity" class="echart-panel echart-panel-batch"></div></div>'
+      + '</div></div>';
+  }
+
+  function exportDashboardPng() {
+    if (typeof echarts === 'undefined') {
+      alert('图表库未加载');
+      return;
+    }
+    const ids = ['trend_chart', 'chart_severity_pie', 'chart_risk_bar', 'chart_disease_top', 'chart_crop_pie', 'chart_urgency_pie', 'chart_activity_bar', 'chart_scatter'];
+    const urls = [];
+    if (trendChart) {
+      try { urls.push({ name: 'trend', url: trendChart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fafaf9' }) }); } catch (e) {}
+    }
+    ids.slice(1).forEach(function(id) {
+      const ch = vizChartInstances[id];
+      if (ch) {
+        try { urls.push({ name: id.replace('chart_', ''), url: ch.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fafaf9' }) }); } catch (e) {}
+      }
+    });
+    if (!urls.length) {
+      alert('暂无图表可导出，请先加载数据');
+      return;
+    }
+    urls.forEach(function(item, i) {
+      const a = document.createElement('a');
+      a.href = item.url;
+      a.download = 'zhinong_' + item.name + '_' + Date.now() + (urls.length > 1 ? '_' + (i + 1) : '') + '.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    });
+    if (urls.length > 1) alert('已下载 ' + urls.length + ' 张 PNG（趋势 + 各统计图）');
+  }
+
+  function resizeAllVizCharts() {
+    Object.keys(vizChartInstances).forEach(function(id) {
+      if (vizChartInstances[id]) vizChartInstances[id].resize();
+    });
+    Object.keys(batchChartInstances).forEach(function(id) {
+      if (batchChartInstances[id]) batchChartInstances[id].resize();
+    });
+    if (trendChart) trendChart.resize();
+  }
+
+  function refreshVisualizationCharts() {
+    const params = getVizFilterParams();
+    const qs = '?days=' + encodeURIComponent(params.days) + '&source=' + encodeURIComponent(params.source);
+    fetch('/api/dashboard_stats' + qs).then(function(r) { return r.json(); }).then(function(stats) {
+      if (stats.chart_data && stats.chart_data.labels && stats.chart_data.labels.length) {
+        window.__chartData = sanitizeChartPayload(stats.chart_data);
+      } else {
+        window.__chartData = null;
+      }
+      initTrendChart();
+      if (stats.visualization) {
+        window.__vizData = stats.visualization;
+        renderVisualizationCharts(stats.visualization);
+      }
+      updateVizFilterHint(stats);
+    }).catch(function() {});
+  }
+
+  function reloadChartFromServer() {
+    refreshVisualizationCharts();
   }
 
   function animateMeters() {
@@ -518,30 +1655,29 @@
       requestAnimationFrame(step);
     });
   }
-  animateMeters();
-  initTrendChart();
 
-  window.addEventListener('resize', function() {
-    if (trendChart) {
-      trendChart.resize();
-    }
-  });
+  function getMetaText() {
+    const dl = document.querySelector('.meta-dl');
+    if (!dl) return '';
+    return Array.from(dl.querySelectorAll('.meta-dl-row')).map(row => {
+      const dt = row.querySelector('dt');
+      const dd = row.querySelector('dd');
+      if (!dt || !dd) return '';
+      return dt.textContent.trim() + '：' + dd.textContent.trim();
+    }).filter(Boolean).join(' · ');
+  }
 
   function buildShareText() {
     const summaryEl = document.querySelector('.summary');
-    const metaEl = document.querySelector('.meta-line.compact');
     const meterEl = document.querySelector('.meter .meter-center .big');
     const severityEl = document.querySelector('.result-highlight strong');
     const title = '植物病害图片评估结果';
     const score = meterEl ? meterEl.textContent.trim() : '';
     const severity = severityEl ? severityEl.textContent.trim() : '';
-    return [
-      title,
-      score ? `病害风险评分：${score}` : '',
-      severity ? `严重程度：${severity}` : '',
-      summaryEl ? summaryEl.textContent.trim() : '',
-      metaEl ? metaEl.textContent.trim().replace(/\s+/g, ' ') : ''
-    ].filter(Boolean).join('\n');
+    const metaText = getMetaText();
+    return [title, score ? '病害风险评分：' + score : '', severity ? '严重程度：' + severity : '',
+      summaryEl ? summaryEl.textContent.trim() : '', metaText
+    ].filter(Boolean).join('\\n');
   }
 
   window.copySummary = async function() {
@@ -551,17 +1687,11 @@
         await navigator.clipboard.writeText(report);
       } else {
         const ta = document.createElement('textarea');
-        ta.value = report;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        ta.remove();
+        ta.value = report; document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); ta.remove();
       }
       alert('摘要已复制');
-    } catch (e) {
-      console.warn(e);
-      alert('复制失败');
-    }
+    } catch (e) { console.warn(e); alert('复制失败'); }
   };
 
   window.shareResult = async function() {
@@ -571,15 +1701,10 @@
       if (navigator.share) {
         await navigator.share({ title: '植物病害图片评估结果', text, url });
       } else if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(text + '\n' + url);
+        await navigator.clipboard.writeText(text + '\\n' + url);
         alert('当前浏览器不支持原生分享，已复制分享文案');
-      } else {
-        alert('当前浏览器不支持分享');
-      }
-    } catch (e) {
-      console.warn(e);
-      alert('分享失败');
-    }
+      } else { alert('当前浏览器不支持分享'); }
+    } catch (e) { console.warn(e); alert('分享失败'); }
   };
 
   window.downloadAnnotated = function() {
@@ -587,21 +1712,14 @@
       const img = document.querySelector('.result-image-view img, .panel.results img');
       if (!img || !img.src) { alert('未找到结果图像'); return; }
       const a = document.createElement('a');
-      a.href = img.src;
-      a.download = 'evaluation_result.png';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    } catch (e) {
-      console.warn(e);
-      alert('下载失败');
-    }
+      a.href = img.src; a.download = 'evaluation_result.png';
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch (e) { console.warn(e); alert('下载失败'); }
   };
 
   window.downloadReport = function() {
     try {
       const summaryEl = document.querySelector('.summary');
-      const metaEl = document.querySelector('.meta-line.compact');
       const probsEls = document.querySelectorAll('.probs .prob');
       const probs = {};
       probsEls.forEach(p => {
@@ -609,75 +1727,406 @@
         const val = p.querySelector('strong') && p.querySelector('strong').textContent.trim();
         if (key) probs[key] = val;
       });
-      const img = document.querySelector('.result-image-view img, .panel.results img');
       const report = {
         summary: summaryEl ? summaryEl.textContent.trim() : '',
-        meta: metaEl ? metaEl.textContent.trim() : '',
+        meta: getMetaText(),
         probabilities: probs,
-        annotated_image: img ? img.src : null,
       };
       const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = 'evaluation_report.json';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      a.href = url; a.download = 'evaluation_report.json';
+      document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
-    } catch (e) {
-      console.warn(e);
-      alert('导出报告失败');
-    }
+    } catch (e) { console.warn(e); alert('导出报告失败'); }
   };
 
-  window.generateQR = function() {
-    const qrContainer = document.getElementById('qr_container');
-    if (!qrContainer) return;
-    const text = buildShareText() || window.location.href;
-    const encoded = encodeURIComponent(text);
-    const src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encoded}`;
-    qrContainer.style.display = 'block';
-    qrContainer.innerHTML = `
-      <div class="qr-box">
-        <div class="qr-title">结果二维码</div>
-        <img src="${src}" alt="二维码">
-        <div class="qr-note">扫码即可查看或转发结果摘要</div>
-      </div>
-    `;
-  };
+  // ===== Tag Strip Navigation =====
+  document.querySelectorAll('.tag-item[data-target]').forEach(tag => {
+    tag.addEventListener('click', function() {
+      const target = this.getAttribute('data-target');
+      document.querySelector(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.querySelectorAll('.tag-item').forEach(t => t.classList.remove('active'));
+      this.classList.add('active');
+    });
+  });
 
-  window.addEventListener('DOMContentLoaded', function() {
-    if (previewField && previewField.value.trim()) {
-      if (previewField.value.startsWith('data:')) {
-        previewImg.src = previewField.value;
-      } else {
-        previewImg.src = 'data:image/png;base64,' + previewField.value;
-      }
-      if (previewCard) previewCard.style.display = 'block';
-      if (previewEmpty) previewEmpty.style.display = 'none';
-      if (previewStatus) previewStatus.textContent = '预览已就绪，评估按钮已解锁';
-      setPredictLocked(false);
+  // ===== Disease Modal =====
+  const modalOverlay = document.getElementById('disease_modal_overlay');
+  const modalBody = document.getElementById('disease_modal_body');
+  const diseaseCountDisplay = document.getElementById('disease_count_display');
+  const diseaseSearchInput = document.getElementById('disease_search_input');
+  const diseaseCropFilter = document.getElementById('disease_crop_filter');
+  let allDiseases = [];
+  let activeCropFilter = '';
+
+  function openDiseaseModal() {
+    if (!modalOverlay) return;
+    modalOverlay.style.display = 'flex';
+    modalOverlay.classList.add('is-open');
+    document.body.classList.add('modal-open');
+    if (allDiseases.length > 0) {
+      buildCropFilterChips();
+      filterDiseaseList();
     } else {
-      setPredictLocked(true);
+      loadDiseaseList();
     }
-    if (progressWrap) progressWrap.style.display = 'none';
+    setTimeout(function() { diseaseSearchInput?.focus(); }, 80);
+  }
+
+  function closeDiseaseModal() {
+    if (modalOverlay) {
+      modalOverlay.style.display = 'none';
+      modalOverlay.classList.remove('is-open');
+    }
+    document.body.classList.remove('modal-open');
+  }
+
+  function buildCropFilterChips() {
+    if (!diseaseCropFilter) return;
+    const crops = [];
+    allDiseases.forEach(function(d) {
+      const c = (d.crop || '').trim();
+      if (c && crops.indexOf(c) < 0) crops.push(c);
+    });
+    crops.sort();
+    let html = '<button type="button" class="crop-filter-chip active" data-crop="">全部</button>';
+    crops.forEach(function(c) {
+      html += '<button type="button" class="crop-filter-chip" data-crop="' + c.replace(/"/g, '&quot;') + '">' + c + '</button>';
+    });
+    diseaseCropFilter.innerHTML = html;
+    diseaseCropFilter.querySelectorAll('.crop-filter-chip').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        activeCropFilter = btn.getAttribute('data-crop') || '';
+        diseaseCropFilter.querySelectorAll('.crop-filter-chip').forEach(function(b) {
+          b.classList.toggle('active', b === btn);
+        });
+        filterDiseaseList();
+      });
+    });
+  }
+
+  function filterDiseaseList() {
+    const q = (diseaseSearchInput && diseaseSearchInput.value.trim().toLowerCase()) || '';
+    let list = allDiseases.slice();
+    if (activeCropFilter) {
+      list = list.filter(function(d) { return (d.crop || '') === activeCropFilter; });
+    }
+    if (q) {
+      list = list.filter(function(d) {
+        return d.name.toLowerCase().includes(q)
+          || (d.description || '').toLowerCase().includes(q)
+          || (d.crop || '').toLowerCase().includes(q)
+          || (d.suggestion || '').toLowerCase().includes(q);
+      });
+    }
+    renderDiseaseList(list);
+    if (diseaseCountDisplay) {
+      diseaseCountDisplay.textContent = '显示 ' + list.length + ' / 共 ' + allDiseases.length + ' 种';
+    }
+  }
+
+  function loadDiseaseList() {
+    if (!modalBody) return;
+    modalBody.innerHTML = '<div class="modal-loading"><span class="modal-spinner" aria-hidden="true"></span><p>正在加载病害数据…</p></div>';
+    fetch('/api/diseases')
+      .then(r => r.json())
+      .then(data => {
+        allDiseases = data.diseases || [];
+        activeCropFilter = '';
+        buildCropFilterChips();
+        filterDiseaseList();
+        if (diseaseCountDisplay) diseaseCountDisplay.textContent = '共 ' + allDiseases.length + ' 种病害';
+        const numEl = document.getElementById('disease_count_num');
+        if (numEl) numEl.textContent = allDiseases.length + ' 种';
+        const heroHint = document.getElementById('hero_catalog_hint');
+        if (heroHint) heroHint.textContent = String(allDiseases.length);
+        const heroEl = document.getElementById('hero_disease_count');
+        if (heroEl) heroEl.textContent = allDiseases.length;
+        const miniEl = document.getElementById('mini_disease_count');
+        if (miniEl) miniEl.textContent = allDiseases.length + ' 类';
+      })
+      .catch(err => {
+        modalBody.innerHTML = '<div class="modal-loading modal-loading-error"><p>加载失败：' + err.message + '</p></div>';
+      });
+  }
+
+  function renderDiseaseList(list) {
+    if (!modalBody) return;
+    if (list.length === 0) {
+      modalBody.innerHTML = '<div class="modal-empty"><span class="modal-empty-icon" aria-hidden="true"></span><p>未找到匹配的病害，请换个关键词</p></div>';
+      return;
+    }
+    modalBody.innerHTML = list.map(d => {
+      const chems = (d.chemical_treatment || []).map(c => '<li>' + c + '</li>').join('');
+      const orgs = (d.organic_treatment || []).map(o => '<li>' + o + '</li>').join('');
+      const prev = (d.prevention || []).map(p => '<li>' + p + '</li>').join('');
+      return `
+      <div class="disease-card">
+        <div class="disease-card-head">
+          <div class="disease-name">${d.name}</div>
+          ${d.crop ? '<span class="crop-badge">' + d.crop + '</span>' : ''}
+        </div>
+        <div class="disease-desc">${d.description}</div>
+        <div class="disease-suggestion"><strong>快速建议</strong><span>${d.suggestion}</span></div>
+        ${d.prevention && d.prevention.length ? '<div class="disease-detail-block"><strong>预防</strong><ul>' + prev + '</ul></div>' : ''}
+        ${d.chemical_treatment && d.chemical_treatment.length ? '<div class="disease-detail-block chemical"><strong>化学防治</strong><ul>' + chems + '</ul></div>' : ''}
+        ${d.phytosanitary_notice ? '<p class="phytosanitary-notice phytosanitary-notice-compact">' + d.phytosanitary_notice + '</p>' : ''}
+        ${d.organic_treatment && d.organic_treatment.length ? '<div class="disease-detail-block organic"><strong>绿色防治</strong><ul>' + orgs + '</ul></div>' : ''}
+        ${d.estimated_cost ? '<div class="disease-meta"><span>成本 ' + d.estimated_cost + '</span>' + (d.treatment_duration ? '<span>周期 ' + d.treatment_duration + '</span>' : '') + '</div>' : ''}
+      </div>`;
+    }).join('');
+  }
+
+  // Modal open triggers
+  document.getElementById('sidebar_disease_list')?.addEventListener('click', function(e) { e.preventDefault(); openDiseaseModal(); });
+  document.getElementById('tag_disease_list')?.addEventListener('click', openDiseaseModal);
+  document.getElementById('search_pill')?.addEventListener('click', openDiseaseModal);
+
+  // Modal close triggers
+  document.getElementById('modal_close_btn')?.addEventListener('click', closeDiseaseModal);
+  document.getElementById('modal_close_btn2')?.addEventListener('click', closeDiseaseModal);
+  modalOverlay?.addEventListener('click', function(e) { if (e.target === this) closeDiseaseModal(); });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { closeDiseaseModal(); closeDetailModal(); }
+  });
+
+  // Disease search filter
+  diseaseSearchInput?.addEventListener('input', function() {
+    filterDiseaseList();
+  });
+
+  // ===== Detail Modal (概览卡片 & 系统信息) =====
+  let dashboardStats = {};
+  const detailOverlay = document.getElementById('detail_modal_overlay');
+  const detailBody = document.getElementById('detail_modal_body');
+  const detailTitle = document.getElementById('detail_modal_title');
+  const detailFooter = document.getElementById('detail_modal_footer');
+  const detailAction = document.getElementById('detail_modal_action');
+
+  function closeDetailModal() {
+    if (detailOverlay) {
+      detailOverlay.style.display = 'none';
+      detailOverlay.classList.remove('is-open');
+    }
+    document.body.classList.remove('modal-open');
+  }
+
+  function openDetailModal(title, html, footer, action) {
+    if (!detailOverlay) return;
+    if (detailTitle) detailTitle.textContent = title;
+    if (detailBody) detailBody.innerHTML = html;
+    if (detailFooter) detailFooter.textContent = footer || '';
+    if (detailAction) {
+      if (action && action.label) {
+        detailAction.style.display = 'inline-flex';
+        detailAction.textContent = action.label;
+        detailAction.onclick = action.onClick || closeDetailModal;
+      } else {
+        detailAction.style.display = 'none';
+      }
+    }
+    detailOverlay.style.display = 'flex';
+    detailOverlay.classList.add('is-open');
+    document.body.classList.add('modal-open');
+  }
+
+  function renderReportRows(reports) {
+    if (!reports || !reports.length) {
+      return '<div class="detail-empty">暂无记录。上传图片识别或点击「加载演示数据」生成示例。</div>';
+    }
+    return '<div class="detail-table">' + reports.map(function(r) {
+      return '<div class="detail-row">'
+        + '<div class="detail-row-main"><strong>' + (r.disease || '未知') + '</strong>'
+        + '<span class="detail-tag">' + (r.severity || '-') + '</span></div>'
+        + '<div class="detail-row-sub">时间 ' + (r.time || '-') + ' · 风险 ' + (r.risk != null ? r.risk + '%' : '-')
+        + (r.demo ? ' · 演示' : '') + '</div>'
+        + (r.filename ? '<a class="detail-link" href="/reports/' + r.filename + '" target="_blank">下载 JSON 报告</a>' : '')
+        + '</div>';
+    }).join('') + '</div>';
+  }
+
+  function showDetail(type) {
+    if (type === 'diseases') { openDiseaseModal(); return; }
+
+    const riskVal = document.getElementById('risk_count_num');
+    const riskText = riskVal ? riskVal.textContent.trim() : '--';
+
+    const contents = {
+      processed: {
+        title: '📋 已处理图片记录',
+        html: '<p class="detail-intro">每次成功识别会生成一条 JSON 诊断记录，以下为最近处理记录：</p>' + renderReportRows(dashboardStats.recent_reports),
+        footer: '共 ' + (dashboardStats.total_reports || 0) + ' 条诊断',
+        action: { label: '去上传识别', onClick: function() { closeDetailModal(); document.getElementById('upload')?.scrollIntoView({ behavior: 'smooth' }); } }
+      },
+      reports: {
+        title: '📄 已生成报告',
+        html: '<p class="detail-intro">系统自动保存 JSON 诊断报告，识别完成后还可导出 PDF：</p>' + renderReportRows(dashboardStats.recent_reports)
+          + '<div class="detail-tip">💡 识别完成后，在结果区可下载 JSON / PDF 报告。</div>',
+        footer: '报告文件共 ' + (document.getElementById('report_file_count')?.textContent || '0'),
+        action: { label: '加载演示数据', onClick: function() { closeDetailModal(); document.getElementById('load_demo_btn')?.click(); } }
+      },
+      risk: {
+        title: '⚠️ 风险预警说明',
+        html: '<div class="risk-level-grid">'
+          + '<div class="risk-level low"><strong>0–40% · 健康</strong><p>叶片状态良好，保持常规巡检即可。</p></div>'
+          + '<div class="risk-level mid"><strong>40–70% · 一般</strong><p>存在病斑风险，建议 7 天内复查并按方案防治。</p></div>'
+          + '<div class="risk-level high"><strong>70–100% · 高风险</strong><p>需立即隔离病株、清除病叶并按紧急方案用药。</p></div>'
+          + '</div>'
+          + '<div class="detail-current">当前评分：<strong>' + riskText + '</strong></div>',
+        footer: riskText === '--%' ? '上传图片后可获得实时风险评分' : '基于最近一次识别结果',
+        action: riskText === '--%' ? { label: '立即上传识别', onClick: function() { closeDetailModal(); document.getElementById('upload')?.scrollIntoView({ behavior: 'smooth' }); } }
+          : { label: '查看识别结果', onClick: function() { closeDetailModal(); document.getElementById('results_section')?.scrollIntoView({ behavior: 'smooth' }); } }
+      },
+      model: {
+        title: '🧠 模型架构',
+        html: '<div class="detail-spec"><div class="spec-row"><span>骨干网络</span><strong>MobileNetV2</strong></div>'
+          + '<div class="spec-row"><span>注意力</span><strong>CrossTaskAttention</strong></div>'
+          + '<div class="spec-row"><span>任务</span><strong>病害分类 + 严重程度 + 风险评分</strong></div>'
+          + '<div class="spec-row"><span>权重文件</span><strong>best_multitask_model.pth</strong></div>'
+          + '<div class="spec-row"><span>准确率</span><strong>Top-1 ~74.7%（61类）</strong></div></div>'
+          + '<p class="detail-intro">轻量级设计，适合 CPU/GPU 推理与局域网部署。</p>',
+        footer: '可通过环境变量 MODEL_PATH 切换权重',
+      },
+      input: {
+        title: '🖼️ 输入预处理',
+        html: '<div class="detail-spec"><div class="spec-row"><span>尺寸</span><strong>128 × 128 像素</strong></div>'
+          + '<div class="spec-row"><span>色彩</span><strong>RGB 三通道</strong></div>'
+          + '<div class="spec-row"><span>归一化</span><strong>ImageNet mean/std</strong></div>'
+          + '<div class="spec-row"><span>支持格式</span><strong>JPG PNG BMP GIF TIFF WEBP</strong></div>'
+          + '<div class="spec-row"><span>大小限制</span><strong>单张最大 10MB</strong></div></div>'
+          + '<p class="detail-intro">建议拍摄清晰叶片特写，避免模糊、强反光和背景干扰。</p>',
+        footer: '上传后先预览，确认无误再识别',
+      },
+      port: {
+        title: '🔌 服务访问',
+        html: '<div class="detail-spec"><div class="spec-row"><span>本地访问</span><strong>http://localhost:7860</strong></div>'
+          + '<div class="spec-row"><span>局域网</span><strong>http://&lt;本机IP&gt;:7860</strong></div>'
+          + '<div class="spec-row"><span>批量 API</span><strong>POST /batch_predict</strong></div>'
+          + '<div class="spec-row"><span>病害库 API</span><strong>GET /api/diseases</strong></div></div>'
+          + '<p class="detail-intro">启动命令：<code>py app.py</code></p>',
+        footer: '详见 API 文档页面',
+        action: { label: '打开 API 文档', onClick: function() { window.location.href = '/api'; } }
+      },
+      dataset: {
+        title: '📦 数据来源',
+        html: '<div class="detail-spec"><div class="spec-row"><span>主数据集</span><strong>PlantVillage</strong></div>'
+          + '<div class="spec-row"><span>作物</span><strong>苹果、樱桃、玉米、葡萄等</strong></div>'
+          + '<div class="spec-row"><span>知识库</span><strong id="detail_disease_catalog_count">60+ 种病害详细防治方案</strong></div>'
+          + '<div class="spec-row"><span>Kaggle 演示</span><strong>scripts/kaggle_client_demo.py</strong></div></div>'
+          + '<p class="detail-intro">支持 Kaggle 数据集切分、快速训练与客户演示流程。</p>',
+        footer: '首页可点击「加载演示数据」体验',
+      }
+    };
+
+    const c = contents[type];
+    if (c) openDetailModal(c.title, c.html, c.footer, c.action);
+  }
+
+  document.querySelectorAll('.clickable-card[data-detail]').forEach(function(el) {
+    function activate() {
+      const t = el.getAttribute('data-detail');
+      if (t === 'diseases') openDiseaseModal();
+      else showDetail(t);
+    }
+    el.addEventListener('click', activate);
+    el.addEventListener('keydown', function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(); } });
+  });
+
+  document.querySelectorAll('.mini-stat-3d[data-detail]').forEach(function(el) {
+    el.addEventListener('click', function() { showDetail(el.getAttribute('data-detail')); });
+  });
+
+  document.getElementById('detail_modal_close')?.addEventListener('click', closeDetailModal);
+  document.getElementById('detail_modal_close2')?.addEventListener('click', closeDetailModal);
+  detailOverlay?.addEventListener('click', function(e) { if (e.target === this) closeDetailModal(); });
+
+  // ===== Load stats on startup =====
+  function refreshDashboardStats() {
+    fetch('/api/diseases')
+      .then(r => r.json())
+      .then(data => {
+        allDiseases = data.diseases || [];
+        const numEl = document.getElementById('disease_count_num');
+        if (numEl) numEl.textContent = allDiseases.length + ' 种';
+        const heroEl = document.getElementById('hero_disease_count');
+        if (heroEl) heroEl.textContent = allDiseases.length;
+        const heroHint = document.getElementById('hero_catalog_hint');
+        if (heroHint) heroHint.textContent = allDiseases.length;
+        const miniEl = document.getElementById('mini_disease_count');
+        if (miniEl) miniEl.textContent = allDiseases.length + ' 类';
+        if (diseaseCountDisplay) diseaseCountDisplay.textContent = '共 ' + allDiseases.length + ' 种病害';
+        const detailCat = document.getElementById('detail_disease_catalog_count');
+        if (detailCat) detailCat.textContent = allDiseases.length + ' 种病害详细防治方案';
+      })
+      .catch(() => {});
+
+    fetch('/api/dashboard_stats')
+      .then(r => r.json())
+      .then(data => {
+        dashboardStats = data;
+        const rc = document.getElementById('report_count');
+        if (rc) rc.textContent = data.total_reports + ' 张';
+        const rfc = document.getElementById('report_file_count');
+        if (rfc) rfc.textContent = (data.total_reports || 0) + ' 份';
+        if (data.visualization) {
+          window.__vizData = data.visualization;
+          renderVisualizationCharts(data.visualization);
+        }
+      })
+      .catch(() => {});
+
+    fetch('/api/report_count')
+      .then(r => r.json())
+      .then(data => {
+        const rfc = document.getElementById('report_file_count');
+        if (rfc) rfc.textContent = data.total_files + ' 份';
+      })
+      .catch(() => {});
+  }
+  refreshDashboardStats();
+
+  document.getElementById('load_demo_btn')?.addEventListener('click', async function() {
+    const btn = this;
+    btn.disabled = true;
+    btn.textContent = '刷新中...';
+    try {
+      const resp = await fetch('/api/demo/seed', { method: 'POST' });
+      const data = await resp.json();
+      if (data.ok) {
+        refreshDashboardStats();
+        reloadChartFromServer();
+        alert('演示数据已刷新：' + (data.message || ''));
+      } else {
+        alert('刷新失败');
+      }
+    } catch (e) {
+      alert('请求失败：' + e.message);
+    }
+    btn.disabled = false;
+    btn.textContent = '刷新演示数据';
   });
 
   // ===== Drag & Drop — Single File =====
   const dropZone = document.getElementById('drop_zone');
-  // fileInput 已在 IIFE 顶部声明
   if (dropZone && fileInput) {
     dropZone.addEventListener('click', () => fileInput.click());
-    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-    dropZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropZone.classList.remove('dragover');
+    dropZone.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+    });
+    ['dragover', 'dragenter'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('dragover'); }));
+    ['dragleave', 'dragend'].forEach(ev => dropZone.addEventListener(ev, e => dropZone.classList.remove('dragover')));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault(); dropZone.classList.remove('dragover');
       const files = e.dataTransfer.files;
-      if (files.length > 0) {
-        fileInput.files = files;
-        fileInput.dispatchEvent(new Event('change'));
+      if (files.length > 0) { fileInput.files = files; fileInput.dispatchEvent(new Event('change')); }
+    });
+    fileInput.addEventListener('change', function() {
+      const has = fileInput.files && fileInput.files.length > 0;
+      dropZone.classList.toggle('has-file', !!has);
+      if (has) {
+        const hint = dropZone.querySelector('.drop-zone-hint');
+        if (hint) hint.textContent = '已选择：' + fileInput.files[0].name;
       }
     });
   }
@@ -693,42 +2142,73 @@
   const batchResults = document.getElementById('batch_results');
   let batchFiles = [];
 
+  function escapeHtml(str) {
+    return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function renderBatchLoading() {
+    return '<div class="batch-summary batch-summary-loading">'
+      + '<span class="batch-spinner" aria-hidden="true"></span>'
+      + '<span class="bs-loading-text">正在上传并处理批量任务…</span></div>';
+  }
+
+  function renderBatchSummary(total, success, fail) {
+    return '<div class="batch-summary">'
+      + '<div class="bs-stat"><span class="bs-num">' + total + '</span><span class="bs-label">总计</span></div>'
+      + '<div class="bs-stat bs-stat-success"><span class="bs-num">' + success + '</span><span class="bs-label">成功</span></div>'
+      + '<div class="bs-stat bs-stat-fail"><span class="bs-num">' + fail + '</span><span class="bs-label">失败</span></div>'
+      + '</div>';
+  }
+
+  function renderBatchStat(label, value) {
+    return '<div class="br-stat"><span class="br-stat-label">' + label + '</span><span class="br-stat-value">' + escapeHtml(value) + '</span></div>';
+  }
+
+  function renderBatchCard(item) {
+    if (item.error) {
+      return '<article class="batch-result-card is-error">'
+        + '<div class="br-header"><div class="br-file"><span class="br-file-icon" aria-hidden="true"></span><span class="br-filename">' + escapeHtml(item.filename) + '</span></div>'
+        + '<span class="br-status error">失败</span></div>'
+        + '<div class="br-detail br-error-msg">' + escapeHtml(item.error) + '</div></article>';
+    }
+    const treatment = item.treatment_summary
+      ? '<div class="br-treatment"><span class="br-treatment-label">防治建议</span><p>' + escapeHtml(item.treatment_summary) + '</p></div>'
+      : '';
+    return '<article class="batch-result-card is-success">'
+      + '<div class="br-header"><div class="br-file"><span class="br-file-icon" aria-hidden="true"></span><span class="br-filename">' + escapeHtml(item.filename) + '</span></div>'
+      + '<span class="br-status success">成功</span></div>'
+      + '<div class="br-stats">'
+      + renderBatchStat('病害', item.disease_name || '未知')
+      + renderBatchStat('作物', item.crop || '-')
+      + renderBatchStat('严重程度', item.severity || '未知')
+      + renderBatchStat('紧急程度', item.urgency || '-')
+      + renderBatchStat('风险评分', item.risk_score ?? '-')
+      + renderBatchStat('置信度', item.confidence ? item.confidence + '%' : '-')
+      + '</div>' + treatment + '</article>';
+  }
+
   if (batchDropZone && batchFileInput) {
-    document.getElementById('batch_file_trigger')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      batchFileInput.click();
+    document.getElementById('batch_file_trigger')?.addEventListener('click', e => { e.stopPropagation(); batchFileInput.click(); });
+    batchDropZone.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); batchFileInput.click(); }
     });
-    batchDropZone.addEventListener('dragover', (e) => { e.preventDefault(); batchDropZone.classList.add('dragover'); });
-    batchDropZone.addEventListener('dragleave', () => batchDropZone.classList.remove('dragover'));
-    batchDropZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      batchDropZone.classList.remove('dragover');
+    ['dragover', 'dragenter'].forEach(ev => batchDropZone.addEventListener(ev, e => { e.preventDefault(); batchDropZone.classList.add('dragover'); }));
+    ['dragleave', 'dragend'].forEach(ev => batchDropZone.addEventListener(ev, e => batchDropZone.classList.remove('dragover')));
+    batchDropZone.addEventListener('drop', e => {
+      e.preventDefault(); batchDropZone.classList.remove('dragover');
       const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/') || f.name.endsWith('.zip'));
-      if (files.length > 0) {
-        batchFileInput.files = null;
-        batchFiles = files;
-        updateBatchFileList();
-      }
+      if (files.length > 0) { batchFileInput.files = null; batchFiles = files; updateBatchFileList(); }
     });
     batchFileInput.addEventListener('change', () => {
-      if (batchFileInput.files && batchFileInput.files.length > 0) {
-        batchFiles = Array.from(batchFileInput.files);
-        updateBatchFileList();
-      }
+      if (batchFileInput.files && batchFileInput.files.length > 0) { batchFiles = Array.from(batchFileInput.files); updateBatchFileList(); }
     });
   }
 
   function updateBatchFileList() {
     if (!batchFileList || !batchPredictBtn) return;
-    if (batchFiles.length === 0) {
-      batchFileList.style.display = 'none';
-      batchPredictBtn.disabled = true;
-      return;
-    }
+    if (batchFiles.length === 0) { batchFileList.style.display = 'none'; batchPredictBtn.disabled = true; return; }
     batchFileList.style.display = 'block';
-    batchFileList.innerHTML = batchFiles.map(f =>
-      `<div class="file-item">${f.name} (${(f.size / 1024).toFixed(1)} KB)</div>`
-    ).join('');
+    batchFileList.innerHTML = batchFiles.map(f => '<div class="file-item">' + f.name + ' (' + (f.size / 1024).toFixed(1) + ' KB)</div>').join('');
     batchPredictBtn.disabled = false;
   }
 
@@ -737,93 +2217,124 @@
       if (batchFiles.length === 0) return;
       batchPredictBtn.disabled = true;
       if (batchProgressWrap) batchProgressWrap.style.display = 'block';
-      if (batchResults) batchResults.style.display = 'block';
-      if (batchResults) batchResults.innerHTML = '<div class="batch-summary"><span class="bs-item"><span class="bs-num">⏳</span><span class="bs-label">处理中...</span></span></div>';
+      if (batchProgressBar) batchProgressBar.style.width = '10%';
+      if (batchProgressText) batchProgressText.textContent = '正在上传并处理...';
+      if (batchResults) {
+        batchResults.style.display = 'block';
+        batchResults.innerHTML = renderBatchLoading();
+      }
 
-      const total = batchFiles.length;
-      let completed = 0;
-      let resultsHtml = '';
-
-      for (let i = 0; i < total; i++) {
-        const file = batchFiles[i];
-        const formData = new FormData();
-        // Check if it's a zip file
-        if (file.name.endsWith('.zip')) {
-          formData.append('batch_zip', file);
+      const fd = new FormData();
+      batchFiles.forEach(file => {
+        if (file.name.toLowerCase().endsWith('.zip')) {
+          fd.append('batch_zip', file);
         } else {
-          formData.append('batch_images', file);
+          fd.append('batch_images', file);
         }
-        formData.append('index', i);
+      });
+      const saveCb = document.getElementById('batch_save_reports');
+      if (saveCb && saveCb.checked) fd.append('save_reports', '1');
 
-        try {
-          const resp = await fetch('/batch_predict', { method: 'POST', body: formData });
-          const data = await resp.json();
-          completed++;
-          const pct = Math.round((completed / total) * 100);
-          if (batchProgressBar) batchProgressBar.style.width = pct + '%';
-          if (batchProgressText) batchProgressText.textContent = `批量处理中：${completed} / ${total}`;
+      try {
+        if (batchProgressBar) batchProgressBar.style.width = '50%';
+        const resp = await fetch('/batch_predict', { method: 'POST', body: fd });
+        const data = await resp.json();
+        if (batchProgressBar) batchProgressBar.style.width = '100%';
 
-          if (data.error) {
-            resultsHtml += `
-              <div class="batch-result-card">
-                <div class="br-header">
-                  <span class="br-filename">${file.name}</span>
-                  <span class="br-status error">失败</span>
-                </div>
-                <div class="br-detail">${data.error}</div>
-              </div>`;
-          } else {
-            resultsHtml += `
-              <div class="batch-result-card">
-                <div class="br-header">
-                  <span class="br-filename">${file.name}</span>
-                  <span class="br-status success">成功</span>
-                </div>
-                <div class="br-detail">
-                  <strong>病害：</strong>${data.disease_name || '未知'}<br>
-                  <strong>严重程度：</strong>${data.severity || '未知'}<br>
-                  <strong>风险评分：</strong>${data.risk_score ?? '-'}<br>
-                  <strong>置信度：</strong>${data.confidence ? (data.confidence + '%') : '-'}
-                </div>
-              </div>`;
-          }
+        if (data.error) {
+          if (batchResults) batchResults.innerHTML = '<article class="batch-result-card is-error"><div class="br-detail br-error-msg">' + escapeHtml(data.error) + '</div></article>';
+        } else {
+          const items = data.results || [];
+          let successCount = 0, failCount = 0, resultsHtml = '';
+          items.forEach(item => {
+            if (item.error) failCount++;
+            else successCount++;
+            resultsHtml += renderBatchCard(item);
+          });
+          const bv = data.batch_visualization;
+          const metaLine = data.reports_saved ? '已写入 reports/' : '';
+          lastBatchExportPayload = {
+            batch_id: data.batch_id,
+            total: data.total,
+            reports_saved: data.reports_saved,
+            batch_visualization: bv,
+            results: items,
+          };
+          const vizHtml = bv ? renderBatchVizSection(bv, metaLine) : '';
           if (batchResults) {
-            batchResults.innerHTML = `
-              <div class="batch-summary">
-                <span class="bs-item"><span class="bs-num">${completed}</span><span class="bs-label">/ ${total} 完成</span></span>
-                <span class="bs-item"><span class="bs-num">${resultsHtml.split('成功').length - 1}</span><span class="bs-label">成功</span></span>
-                <span class="bs-item"><span class="bs-num">${resultsHtml.split('失败').length - 1}</span><span class="bs-label">失败</span></span>
-              </div>
-              ${resultsHtml}`;
+            batchResults.innerHTML = renderBatchSummary(items.length, successCount, failCount) + vizHtml + resultsHtml;
+            document.getElementById('batch_export_csv')?.addEventListener('click', function() {
+              downloadBatchCsv(lastBatchExportPayload && lastBatchExportPayload.results);
+            });
+            document.getElementById('batch_export_json')?.addEventListener('click', function() {
+              downloadBatchJson(lastBatchExportPayload);
+            });
+            document.getElementById('batch_export_png')?.addEventListener('click', exportBatchChartsPng);
+            if (bv) {
+              requestAnimationFrame(function() {
+                renderBatchVisualizationCharts(bv);
+                resizeAllVizCharts();
+              });
+            }
+            batchResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
-        } catch (err) {
-          console.error('Batch error:', err);
-          completed++;
-          resultsHtml += `
-            <div class="batch-result-card">
-              <div class="br-header">
-                <span class="br-filename">${file.name}</span>
-                <span class="br-status error">失败</span>
-              </div>
-              <div class="br-detail">请求失败: ${err.message}</div>
-            </div>`;
         }
+      } catch (err) {
+        if (batchResults) batchResults.innerHTML = '<article class="batch-result-card is-error"><div class="br-detail br-error-msg">请求失败: ' + escapeHtml(err.message) + '</div></article>';
       }
 
       if (batchProgressWrap) batchProgressWrap.style.display = 'none';
       batchPredictBtn.disabled = false;
-      if (batchResults) {
-        batchResults.innerHTML = `
-          <div class="batch-summary">
-            <span class="bs-item"><span class="bs-num">${completed}</span><span class="bs-label">/ ${total} 完成</span></span>
-            <span class="bs-item"><span class="bs-num">${resultsHtml.split('成功').length - 1}</span><span class="bs-label">成功</span></span>
-            <span class="bs-item"><span class="bs-num">${resultsHtml.split('失败').length - 1}</span><span class="bs-label">失败</span></span>
-          </div>
-          ${resultsHtml}`;
-        batchResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+      refreshDashboardStats();
+      refreshVisualizationCharts();
     });
   }
+
+  // ===== Init =====
+  animateMeters();
+
+  window.addEventListener('resize', function() {
+    resizeAllVizCharts();
+  });
+
+  function bootTrendChart() {
+    initTrendChart();
+    reloadChartFromServer();
+    initResultProbChart();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootTrendChart);
+  } else {
+    bootTrendChart();
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    getVizFilterParams();
+    document.getElementById('viz_apply_filters')?.addEventListener('click', function() {
+      persistVizFilters();
+      refreshVisualizationCharts();
+    });
+    document.getElementById('viz_filter_days')?.addEventListener('change', function() {
+      persistVizFilters();
+      refreshVisualizationCharts();
+    });
+    document.getElementById('viz_filter_source')?.addEventListener('change', function() {
+      persistVizFilters();
+      refreshVisualizationCharts();
+    });
+    document.getElementById('viz_export_png')?.addEventListener('click', exportDashboardPng);
+
+    if (previewField && previewField.value.trim()) {
+      previewImg.src = previewField.value.startsWith('data:') ? previewField.value : 'data:image/png;base64,' + previewField.value;
+      if (previewCard) previewCard.style.display = 'block';
+      if (previewEmpty) previewEmpty.style.display = 'none';
+      if (previewStatus) previewStatus.textContent = '预览已就绪';
+      setPredictLocked(false);
+    } else {
+      setPredictLocked(true);
+    }
+    if (progressWrap) progressWrap.style.display = 'none';
+  });
 })();
 </script>
 </body>

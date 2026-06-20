@@ -107,8 +107,38 @@ def api_doc():
 from PIL import Image
 
 from scripts.inference_utils import predict_image, predict_with_uncertainty, load_model
+from scripts.utils import DISEASE_DETAILS
+from scripts.treatment_engine import enrich_disease_list_entry
+from scripts.demo_data import (
+    ensure_runtime_reports,
+    build_case_payload,
+    get_showcase_list,
+    write_seed_reports,
+)
+from scripts.dashboard_analytics import (
+    build_batch_visualization,
+    build_trend_chart_series,
+    build_visualization_payload,
+    catalog_crop_histogram,
+)
+from scripts.report_schema import enrich_meta_from_treatment, normalize_report_object
 import json
 from datetime import datetime
+
+_demo_count, _demo_msg = ensure_runtime_reports()
+if _demo_count:
+    logging.getLogger(__name__).info('[demo] %s', _demo_msg)
+
+
+def _format_chart_label(time_str, index=0):
+    """将 generated_at / 文件名中的日期转为短标签，如 6/2、诊断3。"""
+    s = str(time_str or '')
+    m = re.search(r'(\d{4})(\d{2})(\d{2})', s)
+    if m:
+        return f'{int(m.group(2))}/{int(m.group(3))}'
+    if 'T' in s and len(s) > 10:
+        return f'诊断{index + 1}'
+    return f'诊断{index + 1}'
 
 # ── 启动模型校验 ──────────────────────────────────────────
 _MODEL_PATH = os.environ.get('MODEL_PATH', 'best_multitask_model.pth')
@@ -266,6 +296,93 @@ def _host_resolves_to_private(hostname: str) -> bool:
     # if DNS fails, err on the side of safety by denying
     return True
   return False
+
+
+def _index_image_helpers():
+    """供 index 与 /api/preview 共用的图片读取逻辑。"""
+
+    def _bytes_from_source(file, image_url):
+        if (not file or not file.filename) and image_url:
+            parsed = urlparse(image_url)
+            if parsed.scheme not in ("http", "https"):
+                raise ValueError("仅支持 http/https 图片 URL")
+            host = parsed.hostname or ""
+            if host.lower().startswith('localhost') or host.startswith('127.'):
+                raise ValueError("拒绝下载内网或本地地址")
+            if _host_resolves_to_private(host):
+                raise ValueError("拒绝下载内网或本地地址")
+            resp = requests.get(image_url, timeout=8, stream=True)
+            resp.raise_for_status()
+            ct = (resp.headers.get('Content-Type') or '').lower()
+            if not ct.startswith('image/'):
+                raise ValueError('下载的资源不是图片 (Content-Type 非 image/*)')
+            max_bytes = app.config.get('MAX_CONTENT_LENGTH', 10 * 1024 * 1024)
+            cl = resp.headers.get("Content-Length")
+            if cl and int(cl) > max_bytes:
+                raise ValueError(f"图片太大，最大支持 {max_bytes // (1024 * 1024)}MB")
+            data = resp.content
+            if len(data) > max_bytes:
+                raise ValueError(f"图片太大，最大支持 {max_bytes // (1024 * 1024)}MB")
+            if _detect_image_signature(data) is None:
+                raise ValueError('下载内容不是受支持的图片格式')
+            return data
+
+        filename = getattr(file, 'filename', '') or ''
+        if _FILENAME_BAD_RE.search(filename):
+            raise ValueError('上传文件名含可疑扩展名，已被拒绝')
+        data = file.read()
+        max_bytes = app.config.get('MAX_CONTENT_LENGTH', 10 * 1024 * 1024)
+        if data and len(data) > max_bytes:
+            raise ValueError(f'上传文件过大，最大支持 {max_bytes // (1024 * 1024)}MB')
+        if _detect_image_signature(data) is None:
+            raise ValueError('上传内容不是受支持的图片格式')
+        return data
+
+    def _decode_bytes_to_image(data):
+        if not data:
+            raise ValueError("上传文件为空")
+        prefix = (data[:40] or b"").lower()
+        if prefix.startswith(b"[internetshortcut]") or b"url=" in prefix or prefix.startswith(b"http"):
+            raise ValueError("检测到上传内容像是链接/快捷方式 (.url)，不是图片。")
+        return _open_validated_image(data, 'upload')[0]
+
+    return _bytes_from_source, _decode_bytes_to_image
+
+
+@app.route('/api/preview', methods=['POST'])
+def api_preview():
+    """JSON 预览：本地文件或 URL，返回 preview_b64 与 preview_token。"""
+    import uuid
+    _bytes_from_source, _decode_bytes_to_image = _index_image_helpers()
+    file = request.files.get('image')
+    image_url = (request.form.get('image_url') or '').strip()
+    if request.is_json and request.json:
+        image_url = str(request.json.get('image_url') or image_url).strip()
+    try:
+        if (not file or not file.filename) and not image_url:
+            return jsonify({'ok': False, 'error': '请上传图片或填写 URL'}), 400
+        data = _bytes_from_source(file, image_url)
+        image = _decode_bytes_to_image(data)
+        buf = io.BytesIO()
+        image.save(buf, format='PNG')
+        preview_b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+        preview_token = None
+        tmp_dir = os.path.join(os.getcwd(), 'tmp_uploads')
+        os.makedirs(tmp_dir, exist_ok=True)
+        token = f'{uuid.uuid4().hex}.bin'
+        with open(os.path.join(tmp_dir, token), 'wb') as fh:
+            fh.write(data)
+        preview_token = token
+        return jsonify({
+            'ok': True,
+            'preview_b64': preview_b64,
+            'preview_token': preview_token,
+            'width': image.size[0],
+            'height': image.size[1],
+        })
+    except Exception as exc:
+        logger.warning('API preview failed: %s', exc)
+        return jsonify({'ok': False, 'error': str(exc)}), 400
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -459,12 +576,16 @@ def index():
           json_path = f'{base_name}.json'
           pdf_path = f'{base_name}.pdf'
 
-          report_obj = {
-            'summary': summary,
-            'probabilities': probabilities,
-            'meta': meta,
-            'generated_at': now,
-          }
+          meta = enrich_meta_from_treatment(meta)
+          report_obj = normalize_report_object(
+            summary=summary,
+            probabilities=probabilities,
+            meta=meta,
+            treatment_plan=meta.get('treatment_plan'),
+            generated_at=now,
+            demo=False,
+            source='web_predict',
+          )
           with open(os.path.join(reports_dir, json_path), 'w', encoding='utf-8') as fh:
             json.dump(report_obj, fh, ensure_ascii=False, indent=2)
 
@@ -496,6 +617,7 @@ def index():
             "summary": summary,
             "probabilities": probabilities,
             "meta": meta,
+            "treatment_plan": meta.get("treatment_plan"),
             "report_json": (url_for('download_report', fname=json_path) if os.path.exists(os.path.join(reports_dir, json_path)) else None),
             "report_pdf": (url_for('download_report', fname=pdf_path) if pdf_path and os.path.exists(os.path.join(reports_dir, pdf_path)) else None),
           }
@@ -507,48 +629,41 @@ def index():
         else:
           error = f"图片处理失败：{exc}"
 
-  # prepare chart data for ECharts frontend using recent reports (falls back to demo)
+  # 客户演示：无真实识别时展示内置样例（无需模型）
+  demo_active = False
+  if request.method == 'GET' and not result:
+    show_default = os.environ.get('DEMO_DEFAULT_RESULT', '1').lower() in ('1', 'true', 'yes')
+    case_id = (request.args.get('demo_case') or '').strip() or ('corn_blight' if show_default else '')
+    if case_id:
+      try:
+        payload = build_case_payload(case_id)
+        result = {
+          'annotated_image': payload['annotated_image'],
+          'summary': payload['summary'],
+          'probabilities': payload['probabilities'],
+          'meta': payload['meta'],
+          'treatment_plan': payload['treatment_plan'],
+          'report_json': None,
+          'report_pdf': None,
+        }
+        demo_active = True
+      except Exception as exc:
+        logger.warning('Demo case load failed: %s', exc)
+
+  showcase_cases = get_showcase_list()
+
+  # prepare chart data for ECharts frontend (same filter defaults as dashboard: all / all)
   chart_data = None
   try:
     reports_dir = os.path.join(os.getcwd(), 'reports')
-    labels = []
-    risk = []
-    suggestion = []
-    confidence_series = []
-
-    if os.path.isdir(reports_dir):
-      files = sorted(glob.glob(os.path.join(reports_dir, '*.json')), key=os.path.getmtime)
-      if files:
-        last = files[-7:]
-        for f in last:
-          try:
-            with open(f, 'r', encoding='utf-8') as fh:
-              obj = json.load(fh)
-            gen = obj.get('generated_at') or os.path.basename(f)
-            labels.append(gen)
-            meta = obj.get('meta', {}) or {}
-            dr = meta.get('disease_risk_percent')
-            if dr is None:
-              dr = meta.get('disease_risk') or meta.get('risk_percent') or 50
-            try:
-              drv = int(dr)
-            except Exception:
-              drv = int(float(dr) if dr else 50)
-            risk.append(max(0, min(100, drv)))
-            # suggestion: simple heuristic derived from risk
-            suggestion.append(max(0, min(100, 60 + (50 - drv) // 1)))
-            sc = meta.get('severity_confidence') or meta.get('confidence') or 0.95
-            try:
-              csv = float(sc) * 100
-            except Exception:
-              csv = 95.0
-            confidence_series.append(max(0, min(100, int(csv))))
-          except Exception:
-            continue
-
-    if labels:
-      chart_data = {'labels': labels, 'risk': risk, 'suggestion': suggestion, 'confidence': confidence_series}
-    else:
+    chart_data = build_trend_chart_series(
+      reports_dir,
+      days=None,
+      source_filter='all',
+      max_points=7,
+      label_fn=_format_chart_label,
+    )
+    if not chart_data:
       if result:
         meta = result.get('meta', {}) if isinstance(result, dict) else {}
         base = int(meta.get('disease_risk_percent', 50)) if meta else 50
@@ -562,7 +677,19 @@ def index():
     chart_data = None
 
   chart_json = json.dumps(chart_data, ensure_ascii=False) if chart_data is not None else 'null'
-  return render_template("index.html", result=result, error=error, preview_b64=preview_b64, preview_token=preview_token, chart_data=chart_json)
+  showcase_json = json.dumps(showcase_cases, ensure_ascii=False)
+  return render_template(
+    "index.html",
+    result=result,
+    error=error,
+    preview_b64=preview_b64,
+    preview_token=preview_token,
+    chart_data=chart_json,
+    showcase_cases=showcase_cases,
+    showcase_json=showcase_json,
+    demo_active=demo_active,
+    active_demo_case=request.args.get('demo_case', 'corn_blight' if demo_active else ''),
+  )
 
 
 
@@ -575,8 +702,10 @@ def batch_predict():
     images_to_process = []
     error_prefix = ""
 
-    # 1) 收集图片 ── 从 batch_images 字段 (multiple files)
+    # 1) 收集图片 ── batch_images（标准）或 batch_files（旧前端兼容）
     batch_files = request.files.getlist('batch_images')
+    if not batch_files or not any(f and f.filename for f in batch_files):
+        batch_files = request.files.getlist('batch_files')
     for f in batch_files:
         if f and f.filename:
             data = f.read()
@@ -614,19 +743,48 @@ def batch_predict():
     if not images_to_process:
         return jsonify({'error': '未找到有效的图片文件。支持直接上传图片或 ZIP 压缩包。'}), 400
 
+    batch_id = datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
+    reports_dir = os.path.join(os.getcwd(), 'reports')
+    os.makedirs(reports_dir, exist_ok=True)
+    save_batch_reports = request.form.get('save_reports', '0').lower() in ('1', 'true', 'yes')
+
     results = []
     for fname, img_data in images_to_process:
         try:
             image = _decode_bytes_to_image(img_data)
             annotated, summary, probabilities, meta = predict_image(image)
+            meta = enrich_meta_from_treatment(meta)
+            tp = meta.get('treatment_plan') or {}
+            report_filename = None
+            if save_batch_reports:
+                safe_stem = re.sub(r'[^\w\-.]+', '_', os.path.splitext(fname)[0])[:48]
+                json_name = f'batch_{batch_id}_{safe_stem}.json'
+                report_obj = normalize_report_object(
+                    summary=summary,
+                    probabilities=probabilities,
+                    meta=meta,
+                    treatment_plan=tp,
+                    generated_at=batch_id,
+                    demo=False,
+                    source='batch_predict',
+                    batch_id=batch_id,
+                    input_filename=fname,
+                )
+                with open(os.path.join(reports_dir, json_name), 'w', encoding='utf-8') as fh:
+                    json.dump(report_obj, fh, ensure_ascii=False, indent=2)
+                report_filename = json_name
             results.append({
                 'filename': fname,
                 'disease_name': meta.get('disease_name', '未知'),
+                'crop': meta.get('crop', '未知'),
                 'severity': meta.get('severity', '未知'),
                 'risk_score': meta.get('disease_risk_percent'),
                 'confidence': round(meta.get('disease_confidence', 0) * 100, 2),
                 'severity_confidence': round(meta.get('severity_confidence', 0) * 100, 2),
+                'urgency': meta.get('urgency', tp.get('urgency', '-')),
+                'treatment_summary': tp.get('quick_suggestion', ''),
                 'summary': summary,
+                'report_json': report_filename,
             })
         except Exception as exc:
             logger.warning('Batch predict failed for %s: %s', fname, exc)
@@ -635,7 +793,166 @@ def batch_predict():
                 'error': str(exc),
             })
 
-    return jsonify({'results': results, 'total': len(results)})
+    batch_viz = build_batch_visualization(results)
+    return jsonify({
+        'results': results,
+        'total': len(results),
+        'batch_id': batch_id,
+        'batch_visualization': batch_viz,
+        'reports_saved': save_batch_reports,
+    })
+
+
+@app.route('/api/diseases')
+def api_diseases():
+    """返回可识别的病害列表（含详细防治方案）。"""
+    disease_list = []
+    for idx, info in sorted(DISEASE_DETAILS.items()):
+        disease_list.append(enrich_disease_list_entry(idx, info))
+    return jsonify({
+        "total": len(disease_list),
+        "diseases": disease_list,
+    })
+
+
+def _parse_viz_query_args():
+    """解析仪表盘可视化筛选：days, source。"""
+    days_raw = (request.args.get('days') or 'all').strip().lower()
+    days = None
+    if days_raw not in ('', 'all', '0'):
+        try:
+            days = max(1, min(365, int(days_raw)))
+        except ValueError:
+            days = None
+    source = (request.args.get('source') or 'all').strip().lower()
+    if source not in ('all', 'real', 'demo'):
+        source = 'all'
+    return days, source
+
+
+@app.route('/api/dashboard_stats')
+def api_dashboard_stats():
+    """返回仪表盘统计数据。?days=7|30|all&source=all|real|demo"""
+    days, source = _parse_viz_query_args()
+    reports_dir = os.path.join(os.getcwd(), 'reports')
+    json_reports = []
+    if os.path.isdir(reports_dir):
+        json_reports = sorted(
+            glob.glob(os.path.join(reports_dir, '*.json')),
+            key=os.path.getmtime,
+        )
+    tmp_dir = os.path.join(os.getcwd(), 'tmp_uploads')
+    tmp_count = 0
+    if os.path.isdir(tmp_dir):
+        tmp_count = len([f for f in os.listdir(tmp_dir) if os.path.isfile(os.path.join(tmp_dir, f))])
+
+    recent_diseases = []
+    recent_reports = []
+    chart_labels, chart_risk, chart_suggestion, chart_confidence = [], [], [], []
+    for f in json_reports[-10:]:
+        try:
+            with open(f, 'r', encoding='utf-8') as fh:
+                obj = json.load(fh)
+            meta = obj.get('meta') or {}
+            gen = obj.get('generated_at') or os.path.basename(f)
+            fname = os.path.basename(f)
+            label = gen[4:8] + '日' if len(gen) >= 8 else gen
+            dr = meta.get('disease_risk_percent') or 50
+            entry = {
+                'time': gen,
+                'disease': meta.get('disease_name', '未知'),
+                'severity': meta.get('severity', '-'),
+                'risk': dr,
+                'filename': fname,
+                'demo': bool(obj.get('demo')),
+            }
+            recent_diseases.append(entry)
+            recent_reports.append(entry)
+        except Exception:
+            continue
+
+    trend = build_trend_chart_series(
+        reports_dir,
+        days=days,
+        source_filter=source,
+        max_points=7,
+        label_fn=_format_chart_label,
+    )
+    chart_payload = trend
+    if chart_payload:
+        chart_labels = chart_payload.get('labels') or []
+        chart_risk = chart_payload.get('risk') or []
+        chart_suggestion = chart_payload.get('suggestion') or []
+        chart_confidence = chart_payload.get('confidence') or []
+
+    viz = build_visualization_payload(
+        reports_dir,
+        catalog_crop_counts=catalog_crop_histogram(),
+        days=days,
+        source_filter=source,
+    )
+
+    return jsonify({
+        "disease_types": len(DISEASE_DETAILS),
+        "total_reports": len(json_reports),
+        "filter_days": days,
+        "filter_source": source,
+        "filtered_report_count": viz.get("report_count", 0),
+        "pending_previews": tmp_count,
+        "recent_diagnoses": recent_diseases[-5:],
+        "recent_reports": recent_reports,
+        "chart_data": {
+            "labels": chart_labels,
+            "risk": chart_risk,
+            "suggestion": chart_suggestion,
+            "confidence": chart_confidence,
+        } if chart_labels else None,
+        "visualization": viz,
+    })
+
+
+@app.route('/api/report_count')
+def api_report_count():
+    """返回诊断报告文件夹中的文件统计数量。"""
+    reports_dir = os.path.join(os.getcwd(), 'reports')
+    total_files = 0
+    total_reports = 0
+    if os.path.isdir(reports_dir):
+        json_files = [f for f in os.listdir(reports_dir) if f.endswith('.json')]
+        pdf_files = [f for f in os.listdir(reports_dir) if f.endswith('.pdf')]
+        total_files = len(json_files) + len(pdf_files)
+        total_reports = len(json_files)
+    return jsonify({
+        "total_reports": total_reports,
+        "total_files": total_files,
+    })
+
+
+@app.route('/api/demo/seed', methods=['POST'])
+def api_demo_seed():
+    """生成 7 条演示诊断报告，供客户预览趋势图与统计。"""
+    copied, msg = ensure_runtime_reports(force=True)
+    return jsonify({
+        'ok': True,
+        'created': copied,
+        'message': msg + '，请刷新页面查看趋势图与统计',
+    })
+
+
+@app.route('/api/demo/showcase')
+def api_demo_showcase():
+    """返回客户演示样例列表（无需模型）。"""
+    return jsonify({'cases': get_showcase_list(), 'total': len(get_showcase_list())})
+
+
+@app.route('/api/demo/case/<case_id>')
+def api_demo_case(case_id):
+    """返回单条演示识别结果，结构与真实识别一致。"""
+    try:
+        payload = build_case_payload(case_id)
+        return jsonify({'ok': True, 'result': payload})
+    except Exception as exc:
+        return jsonify({'ok': False, 'error': str(exc)}), 400
 
 
 @app.route('/reports/<path:fname>')

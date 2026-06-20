@@ -1,17 +1,37 @@
 {% extends "base.html" %}
+{% set active_page = 'faq' %}
 {% block title %}常见问题 - 智农{% endblock %}
+{% block crumbs %}常见问题{% endblock %}
+{% block page_title %}常见问题{% endblock %}
+{% block page_desc %}使用前常见疑问与解答。{% endblock %}
+
 {% block content %}
-<div class="panel section">
-  <div class="section-title">
-    <h2>常见问题</h2>
-    <p>FAQ</p>
+<section class="content-panel">
+  <div class="faq-list">
+    <details class="faq-item" open>
+      <summary>支持哪些作物和病虫害？</summary>
+      <p>当前内置知识库覆盖 60+ 种作物健康状态与常见病害（苹果、樱桃、玉米、葡萄、番茄、马铃薯等），含可执行用药与复查建议；模型可扩展至 PlantVillage 61 类。点击首页「病害库」可按作物筛选并查看完整防治方案。</p>
+    </details>
+    <details class="faq-item">
+      <summary>上传图片有什么限制？</summary>
+      <p>支持 JPG / PNG / BMP / GIF / TIFF / WEBP，单张最大 10MB。建议拍摄清晰的叶片正面或病斑特写，避免模糊和强烈反光。</p>
+    </details>
+    <details class="faq-item">
+      <summary>如何使用？需要几步？</summary>
+      <p>四步即可：① 上传图片 → ② 预览确认 → ③ 点击「开始识别」→ ④ 查看防治方案与报告。首页顶部有步骤引导图。</p>
+    </details>
+    <details class="faq-item">
+      <summary>识别结果可以导出吗？</summary>
+      <p>可以。识别完成后支持复制摘要、下载标注结果图、导出 JSON 报告，系统自动生成 PDF 诊断报告。</p>
+    </details>
+    <details class="faq-item">
+      <summary>如何保证识别准确率？</summary>
+      <p>基于 MobileNetV2 多任务深度学习模型，验证集 Top-1 约 74.7%。可开启 MC Dropout 不确定性分析；置信度低时建议人工复核。</p>
+    </details>
+    <details class="faq-item">
+      <summary>可以集成到其他系统吗？</summary>
+      <p>提供 REST API（批量预测、病害列表、演示数据等），详见 <a href="/api">API 文档</a> 页面。</p>
+    </details>
   </div>
-  <ul class="guide-list">
-    <li><strong>Q: 支持哪些作物和病虫害？</strong><br>A: 支持番茄、马铃薯等多种作物，涵盖常见叶部病害。</li>
-    <li><strong>Q: 上传图片有限制吗？</strong><br>A: 支持JPG/PNG/BMP，单张最大5MB。</li>
-    <li><strong>Q: 结果可以导出吗？</strong><br>A: 支持一键导出JSON报告和结果图片。</li>
-    <li><strong>Q: 如何保证识别准确率？</strong><br>A: 基于深度学习多任务模型，持续优化训练数据。</li>
-    <li><strong>Q: 可以集成到其他系统吗？</strong><br>A: 提供API接口，便于二次开发和集成。</li>
-  </ul>
-</div>
+</section>
 {% endblock %}

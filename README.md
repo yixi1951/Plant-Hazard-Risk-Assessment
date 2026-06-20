@@ -13,7 +13,7 @@
 **核心能力：**
 - **多任务联合学习** — 单模型同时预测病害种类（61 类）、严重程度（3 级）和风险评分
 - **可解释诊断** — 支持 Grad-CAM 热力图可视化与结构化诊断报告
-- **Web 交互界面** — 暗色主题仪表盘，支持本地图片上传、URL 抓取、拖拽上传与批量预测
+- **Web 交互界面** — 浅色简洁仪表盘，支持本地图片上传、URL 抓取、拖拽上传与批量预测
 - **灵活部署** — Flask 后端，默认监听 `0.0.0.0:7860`，局域网内即可访问
 
 ---
@@ -78,8 +78,33 @@ python app.py
 | 1 | 上传图片 | 支持拖拽上传、点击选择或粘贴图片 URL |
 | 2 | 预览 | 确认图片内容无误 |
 | 3 | 识别 | 模型输出病害名称、严重程度、风险评分 |
-| 4 | 批量预测 | 支持多张图片同时处理，或上传 ZIP 压缩包 |
-| 5 | 获取报告 | 查看结果图、复制摘要、下载诊断报告 (JSON/PDF) |
+| 4 | 查看方案 | 阅读详细防治方案与复查时间线 |
+| 5 | 批量预测 | 支持多张图片同时处理，或上传 ZIP 压缩包 |
+| 6 | 获取报告 | 查看结果图、复制摘要、下载诊断报告 (JSON/PDF) |
+
+### Kaggle 数据客户演示
+
+```powershell
+# 1) 在 Kaggle 下载 PlantVillage 等数据集后，切分为 train/val
+py scripts/prepare_kaggle_dataset.py --source-dir D:\kaggle\plantvillage --output-dir data/kaggle_demo
+
+# 2) 快速训练（3 epoch 即可用于演示）
+py scripts/train_disease_multitask.py --train-dir data/kaggle_demo/train --val-dir data/kaggle_demo/val --epochs 3 --save-path artifacts/kaggle_demo.pth
+
+# 3) 抽样推理，生成 7 条演示报告
+py scripts/kaggle_client_demo.py --data-dir data/kaggle_demo/val --model-path artifacts/kaggle_demo.pth --samples 7 --output-dir demo_reports
+
+# 4) 将报告复制到 Web 项目并启动
+copy demo_reports\*.json reports\
+py app.py
+```
+
+Web 界面也可直接点击 **「客户演示样例」** 卡片查看完整识别结果；启动服务时会自动注入 7 条演示诊断记录（无需模型）。
+
+**客户演示（开箱即用）：**
+- 打开首页即可看到 **玉米大斑病** 等 4 个样例识别结果与防治方案
+- 概览统计、趋势图自动显示 7 条历史演示数据
+- 设置 `DEMO_DEFAULT_RESULT=0` 可关闭首页默认样例
 
 ---
 
@@ -115,7 +140,7 @@ python app.py
 │   ├── about.html / team.html / faq.html / api.html
 │
 ├── static/
-│   ├── css/main.css                    # 全局样式（玻璃拟态 + 暗色主题）
+│   ├── css/main.css                    # 全局样式（浅色简洁主题）
 │   ├── js/main.js                      # 前端交互逻辑
 │   └── favicon.svg
 │
@@ -181,7 +206,52 @@ MobileNetV2 Backbone (预训练特征提取)
 - **批量预测**：同时处理多张图片或 ZIP 压缩包，实时进度反馈
 - **诊断报告**：每张图片自动生成 JSON + PDF 诊断报告
 - **结果分享**：一键复制摘要、分享结果、下载标注图
-- **ECharts 仪表盘**：风险趋势折线图、风险仪表盘、信心度分布
+- **ECharts 仪表盘**：风险趋势折线图、多维度统计图、筛选与 PNG 导出
+- **批量导出**：CSV / JSON / 批量图表 PNG，便于客户现场带走数据
+
+---
+
+## 仪表盘与数据可视化
+
+首页「趋势分析」与「诊断数据可视化」共用同一套报告聚合逻辑（`scripts/dashboard_analytics.py`）。
+
+| 能力 | 说明 |
+|------|------|
+| **病害风险趋势** | 最近 7 条诊断的风险 / 处理建议 / 置信度折线 |
+| **筛选** | 时间：全部 · 近 7 天 · 近 30 天；来源：全部 · 仅真实识别 · 仅演示 |
+| **筛选联动** | 更改筛选后，**趋势图与下方 7 张统计图同步刷新**（`GET /api/dashboard_stats?days=&source=`） |
+| **导出** | 「导出仪表盘 PNG」下载趋势 + 各统计图 |
+| **批量图表** | 批量识别完成后展示成功/失败、风险区间、病种 Top、严重程度；可导出 CSV / JSON / PNG |
+
+### 指标含义（答辩常用）
+
+- **病害风险评分**（0–100%）：综合模型输出与严重程度的业务风险指数，越高越需尽快防治。
+- **识别置信度**：模型对当前预测（尤其严重程度）的确信程度，与风险分相互独立；低置信度建议人工复核。
+- **处理建议指数**：由风险分推导的处置紧迫度启发值（非独立模型头）。
+- **紧急程度**：防治方案引擎根据病害与严重程度给出的「低 / 中 / 高」执行优先级。
+
+### 诊断报告 JSON 规范（v1）
+
+写入 `reports/*.json` 时统一经 `scripts/report_schema.py`：
+
+| 字段 | 说明 |
+|------|------|
+| `schema_version` | 当前为 `1` |
+| `generated_at` | UTC 时间戳，如 `20250612T120000Z` |
+| `demo` | 是否演示数据（用于「仅演示」筛选） |
+| `source` | `web_predict` / `demo_seed` / `batch_predict` 等 |
+| `meta` | 含 `disease_name`, `crop`, `severity`, `disease_risk_percent`, `severity_confidence`, `urgency` 等 |
+| `probabilities` | 严重程度三档概率 |
+| `treatment_plan` | 防治方案详情 |
+| `batch_id`, `input_filename` | 批量识别可选字段 |
+
+### 模型能力展示要点
+
+- **多任务**：一次前向同时得到病害相关输出、严重程度与风险建议（见「模型架构」）。
+- **MC Dropout**：上传区可勾选「不确定性分析」，结果区展示风险标准差。
+- **知识库**：`/api/diseases` 返回 60+ 病种防治条目，与识别结果中的 `treatment_plan` 一致。
+
+API 细节见 Web 内 **API 文档** 页（`/api`）或下文接口说明。
 
 ---
 

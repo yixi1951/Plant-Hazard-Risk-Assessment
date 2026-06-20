@@ -5,42 +5,67 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}智农 · 农作物病虫害AI智能识别预警系统{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('favicon') }}">
-  <!-- Bootstrap CSS -->
-  <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
-  <!-- Optional custom styles -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   {% block head %}{% endblock %}
 </head>
-<body class="bg-light text-dark">
-  <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom">
-    <div class="container">
-      <a class="navbar-brand fw-bold" href="/">智农</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="mainNav">
-        <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-          <li class="nav-item"><a class="nav-link" href="/">首页</a></li>
-          <li class="nav-item"><a class="nav-link" href="/about">关于</a></li>
-          <li class="nav-item"><a class="nav-link" href="/team">团队</a></li>
-          <li class="nav-item"><a class="nav-link" href="/faq">FAQ</a></li>
-          <li class="nav-item"><a class="nav-link" href="/api">API</a></li>
-        </ul>
-      </div>
+<body class="light-theme theme-field-atlas">
+<div class="page-atmosphere" aria-hidden="true"></div>
+<div class="dashboard-shell">
+  <aside class="admin-sidebar">
+    <div class="brand-card">
+      <a href="/" class="brand-link">
+        <div class="brand-badge"><span class="brand-badge-mark">智</span></div>
+        <div>
+          <div class="brand-title">Field Atlas</div>
+          <div class="brand-subtitle">智农 · 病虫害 AI 预警</div>
+        </div>
+      </a>
     </div>
-  </nav>
 
-  <main class="container-fluid px-4 py-4">
+    <div class="sidebar-section">
+      <div class="sidebar-label">导航</div>
+      <a class="sidebar-link {% if active_page == 'home' %}active{% endif %}" href="/"><span class="nav-icon"></span>识别控制台</a>
+      <a class="sidebar-link {% if active_page == 'about' %}active{% endif %}" href="/about"><span class="nav-icon"></span>关于项目</a>
+      <a class="sidebar-link {% if active_page == 'faq' %}active{% endif %}" href="/faq"><span class="nav-icon"></span>常见问题</a>
+      <a class="sidebar-link {% if active_page == 'team' %}active{% endif %}" href="/team"><span class="nav-icon"></span>团队介绍</a>
+      <a class="sidebar-link {% if active_page == 'api' %}active{% endif %}" href="/api"><span class="nav-icon"></span>API 文档</a>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">快捷操作</div>
+      <a class="btn btn-primary btn-3d w-100 mb-2" href="/#upload">上传识别</a>
+      <a class="btn btn-outline-primary btn-3d w-100" href="/#guide">使用指南</a>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    {% block page_header %}
+    <section class="topbar-panel topbar-hero reveal-up">
+      <div class="topbar-accent" aria-hidden="true"></div>
+      <div class="topbar-copy">
+        <div class="crumbs"><span class="crumb-leaf" aria-hidden="true"></span>智农 / {% block crumbs %}页面{% endblock %}</div>
+        <h1>{% block page_title %}智农{% endblock %}</h1>
+        <p>{% block page_desc %}{% endblock %}</p>
+      </div>
+      <div class="topbar-actions">
+        <div class="status-pill">
+          <span class="dot"></span>
+          系统在线
+        </div>
+      </div>
+    </section>
+    {% endblock %}
+
     {% block content %}{% endblock %}
+
+    <footer class="site-footer">
+      © 智农 · 农作物病虫害AI智能识别预警系统
+    </footer>
   </main>
-
-  <footer class="bg-white border-top py-3 mt-4">
-    <div class="container text-center small text-muted">© 智农 · 农作物病虫害AI智能识别预警系统</div>
-  </footer>
-
-  <!-- Bootstrap JS -->
-  <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-  {% block scripts %}{% endblock %}
+</div>
+{% block scripts %}{% endblock %}
 </body>
 </html>
