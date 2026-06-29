@@ -23,6 +23,7 @@ from scripts.utils import (
     get_crop_type,
     disease_to_severity,
 )
+from scripts.risk_score import risk_tier_from_prediction
 
 # ========== 4. 多任务数据集（支持附件文档的双任务标签加载） ==========
 class MultiTaskDataset(Dataset):
@@ -238,13 +239,10 @@ def batch_generate_reports(model, dataloader, device, disease_mapping, max_repor
                 disease_conf = disease_probs[i][disease_preds[i]].item() * 100
                 severity_conf = severity_probs[i][severity_preds[i]].item() * 100
 
-                # 风险等级判定（适配附件文档“精准防控”需求）
-                if pred_severity == 2 and disease_conf > 80:
-                    risk_level = "高风险（需紧急防控）"
-                elif pred_severity == 1 and disease_conf > 70:
-                    risk_level = "中风险（需密切监测）"
-                else:
-                    risk_level = "低风险（常规管理）"
+                disease_conf_ratio = disease_conf / 100.0 if disease_conf > 1 else disease_conf
+                risk_level = risk_tier_from_prediction(
+                    pred_severity, float(disease_conf_ratio)
+                )
 
                 # 生成Markdown格式诊断报告
                 report = f"""# 作物病害智能诊断报告
@@ -402,9 +400,9 @@ def confidence_based_risk_assessment(model, dataloader, device, disease_mapping,
     for i, v in enumerate(risk_stats.values()):
         plt.text(i, v + 0.5, str(v), ha='center')
     plt.tight_layout()
-    plt.savefig("risk_distribution.png", dpi=300)
+    plt.savefig("docs/img/risk_distribution.png", dpi=300)
     plt.close()
-    print("✅ 风险分布可视化图已保存为 risk_distribution.png")
+    print("✅ 风险分布可视化图已保存为 docs/img/risk_distribution.png")
 
 
 # ========== 9. 多任务训练器（平衡双任务损失与训练效率） ==========
@@ -494,21 +492,9 @@ class MultiTaskTrainer:
 
 # ========== 10. 数据变换（适配MobileNetV2输入与数据增强） ==========
 def create_data_transforms():
-    # 图像尺寸调整为128x128，平衡计算效率与特征保留
-    train_transform = transforms.Compose([
-        transforms.Resize((128, 128)),
-        transforms.RandomHorizontalFlip(p=0.3),
-        transforms.RandomRotation(10),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
+    from scripts.transforms import create_train_val_transforms
 
-    val_transform = transforms.Compose([
-        transforms.Resize((128, 128)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-    return train_transform, val_transform
+    return create_train_val_transforms(128)
 
 
 # ========== 11. 单任务模型（用于多任务协同效应评估） ==========
@@ -664,7 +650,7 @@ def train_multitask_model(sample_ratio=0.5, num_epochs=15, early_stopping_patien
             best_val_loss = val_loss
             best_disease_acc = val_disease_acc
             best_severity_acc = val_severity_acc
-            torch.save(model.state_dict(), 'best_multitask_model.pth')
+            torch.save(model.state_dict(), 'models/models/best_multitask_model.pth')
             print("✅ 保存最佳模型权重")
             early_stopping_counter = 0
         else:

@@ -179,7 +179,7 @@ ax4.set_ylim(0, 1.1)  # 留出空间显示数值标签
 # --------------------------
 plt.tight_layout()  # 自动调整子图间距
 plt.subplots_adjust(hspace=0.3, wspace=0.3)  # 垂直/水平间距
-save_path = 'task1_training_visualization.png'
+save_path = 'docs/img/task1_training_visualization.png'
 plt.savefig(save_path, bbox_inches='tight', dpi=300)  # 保存高清图像
 plt.close()
 

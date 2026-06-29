@@ -69,7 +69,7 @@ def process_images(input_dir, model_path, reports_dir, images_out_dir, limit=Non
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--input-dir', default='data/plantvillage/test', help='Directory with test images')
-    parser.add_argument('--model', default='best_multitask_model.pth', help='Model path')
+    parser.add_argument('--model', default='models/best_multitask_model.pth', help='Model path')
     parser.add_argument('--reports-dir', default='reports', help='Where to write JSON reports')
     parser.add_argument('--images-out', default='static/screenshots', help='Where to save annotated images')
     parser.add_argument('--limit', type=int, default=10)

@@ -530,9 +530,9 @@ def visualize_synergy(mt_metrics, st_disease_metrics, st_severity_metrics):
                      f'增益:+{gain:.2f}%', ha='center', color='red', fontweight='bold', fontsize=9)
 
     plt.tight_layout()
-    plt.savefig('synergy_comparison.png', dpi=300, bbox_inches='tight')
+    plt.savefig('docs/img/synergy_comparison.png', dpi=300, bbox_inches='tight')
     plt.close()
-    print(f"\n✅ 协同效应对比图已保存为 synergy_comparison.png")
+    print(f"\n✅ 协同效应对比图已保存为 docs/img/synergy_comparison.png")
 
 
 # ========== 9. 诊断报告生成器（贴合附件文档需求） ==========
@@ -750,27 +750,16 @@ def confidence_based_risk_assessment(model, dataloader, device, disease_mapping,
     for i, v in enumerate(risk_values):
         plt.text(i, v + 0.5, str(v), ha='center')
     plt.tight_layout()
-    plt.savefig("risk_distribution.png", dpi=300)
+    plt.savefig("docs/img/risk_distribution.png", dpi=300)
     plt.close()
-    print("✅ 风险分布可视化图已保存为 risk_distribution.png")
+    print("✅ 风险分布可视化图已保存为 docs/img/risk_distribution.png")
 
 
 # ========== 12. 数据变换（适配MobileNetV2输入） ==========
 def create_data_transforms():
-    train_transform = transforms.Compose([
-        transforms.Resize((128, 128)),
-        transforms.RandomHorizontalFlip(p=0.3),
-        transforms.RandomRotation(10),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
+    from scripts.transforms import create_train_val_transforms
 
-    val_transform = transforms.Compose([
-        transforms.Resize((128, 128)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-    return train_transform, val_transform
+    return create_train_val_transforms(128)
 
 
 # ========== 13. 主函数（全流程驱动：多任务+单任务+协同效应） ==========
@@ -881,7 +870,7 @@ def train_multitask_with_synergy(sample_ratio=0.5, num_epochs=15, early_stopping
             best_mt_d_f1 = d_f1
             best_mt_s_acc = s_acc
             best_mt_s_f1 = s_f1
-            torch.save(mt_model.state_dict(), 'best_multitask_model.pth')
+            torch.save(mt_model.state_dict(), 'models/best_multitask_model.pth')
             print("✅ 保存最佳多任务模型权重")
             early_stopping_counter = 0
         else:
@@ -920,7 +909,7 @@ def train_multitask_with_synergy(sample_ratio=0.5, num_epochs=15, early_stopping
             best_st_d_loss = val_loss
             best_st_d_acc = val_acc
             best_st_d_f1 = val_f1
-            torch.save(st_disease_model.state_dict(), 'best_single_disease_model.pth')
+            torch.save(st_disease_model.state_dict(), 'models/best_single_disease_model.pth')
             print("✅ 保存最佳单任务疾病模型权重")
             early_stopping_counter = 0
         else:
@@ -956,7 +945,7 @@ def train_multitask_with_synergy(sample_ratio=0.5, num_epochs=15, early_stopping
             best_st_s_loss = val_loss
             best_st_s_acc = val_acc
             best_st_s_f1 = val_f1
-            torch.save(st_severity_model.state_dict(), 'best_single_severity_model.pth')
+            torch.save(st_severity_model.state_dict(), 'models/best_single_severity_model.pth')
             print("✅ 保存最佳单任务严重程度模型权重")
             early_stopping_counter = 0
         else:

@@ -15,6 +15,7 @@
       </thead>
       <tbody>
         <tr><td><code>POST</code></td><td><code>/api/preview</code></td><td>AJAX 生成预览（返回 preview_b64 / preview_token）</td></tr>
+        <tr><td><code>POST</code></td><td><code>/api/predict</code></td><td>JSON 诊断（image / preview_token / image_url），meta 含 risk_tier</td></tr>
         <tr><td><code>POST</code></td><td><code>/</code></td><td>表单上传图片识别（action=predict）</td></tr>
         <tr><td><code>POST</code></td><td><code>/batch_predict</code></td><td>批量预测，支持多图或 ZIP，含可视化聚合</td></tr>
         <tr><td><code>GET</code></td><td><code>/api/diseases</code></td><td>可识别病害列表（含防治方案）</td></tr>

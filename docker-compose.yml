@@ -1,0 +1,13 @@
+services:
+  zhinong:
+    build: .
+    ports:
+      - "7860:7860"
+    environment:
+      FLASK_SECRET_KEY: ${FLASK_SECRET_KEY:-dev-compose-secret}
+      MAX_UPLOAD_MB: "200"
+      MODEL_PATH: /app/models/best_multitask_model.pth
+    volumes:
+      - ./models/best_multitask_model.pth:/app/models/best_multitask_model.pth:ro
+      - ./reports:/app/reports
+    restart: unless-stopped

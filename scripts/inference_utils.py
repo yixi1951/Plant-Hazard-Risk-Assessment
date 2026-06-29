@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw, ImageFont
 from torchvision import models
 
 from scripts.treatment_engine import build_treatment_plan
+from scripts.risk_score import compute_disease_risk_percent, risk_tier_from_prediction, risk_tier_short
 
 
 IMAGE_SIZE = 128
@@ -105,7 +106,7 @@ def _safe_load_state_dict(model, model_path, device):
 
 
 @lru_cache(maxsize=2)
-def load_model(model_path="best_multitask_model.pth", device_name=None):
+def load_model(model_path="models/best_multitask_model.pth", device_name=None):
     device = torch.device(device_name or ("cuda" if torch.cuda.is_available() else "cpu"))
     metadata = _load_model_metadata(model_path)
     num_diseases = int(metadata.get('num_diseases') or len(metadata.get('class_names') or []) or 1)
@@ -163,11 +164,11 @@ def annotate_result(image, title, lines):
     return Image.alpha_composite(canvas, overlay).convert("RGB")
 
 
-def predict_image(image, model_path="best_multitask_model.pth", device_name=None):
+def predict_image(image, model_path="models/best_multitask_model.pth", device_name=None):
     if image is None:
         return None, "请先上传图片。", {}, {}
 
-    model_path = model_path or os.environ.get('MODEL_PATH', 'best_multitask_model.pth')
+    model_path = model_path or os.environ.get('MODEL_PATH', 'models/best_multitask_model.pth')
 
     model, device, metadata = load_model(model_path=model_path, device_name=device_name)
     transform = build_transform()
@@ -178,33 +179,36 @@ def predict_image(image, model_path="best_multitask_model.pth", device_name=None
         disease_logits, severity_logits, _ = model(tensor)
         severity_probs = torch.softmax(severity_logits, dim=1)[0].detach().cpu().tolist()
 
+        class_names = metadata.get('class_names') or []
         if disease_logits.shape[1] == 1:
             disease_prob = torch.sigmoid(disease_logits)[0, 0].detach().cpu().item()
             disease_probs = [float(disease_prob)]
-            class_names = metadata.get('class_names') or ['病害风险']
+            class_names = class_names or ['病害风险']
+            disease_risk, predicted_disease_idx, disease_conf = compute_disease_risk_percent(
+                disease_probs, class_names, single_logit_prob=disease_prob
+            )
             disease_name = class_names[0] if class_names else '病害风险'
-            disease_conf = float(disease_prob)
-            disease_risk = max(0.0, min(100.0, disease_prob * 100.0))
+            disease_class_idx = None
         else:
             disease_probs = torch.softmax(disease_logits, dim=1)[0].detach().cpu().tolist()
-            class_names = metadata.get('class_names') or [f"病害_{idx}" for idx in range(len(disease_probs))]
-            predicted_disease_idx = int(torch.tensor(disease_probs).argmax().item())
-            disease_name = class_names[predicted_disease_idx] if predicted_disease_idx < len(class_names) else f"病害_{predicted_disease_idx}"
-            disease_conf = float(disease_probs[predicted_disease_idx])
+            class_names = class_names or [f"病害_{idx}" for idx in range(len(disease_probs))]
+            disease_risk, predicted_disease_idx, disease_conf = compute_disease_risk_percent(
+                disease_probs, class_names
+            )
+            disease_name = (
+                class_names[predicted_disease_idx]
+                if predicted_disease_idx < len(class_names)
+                else f"病害_{predicted_disease_idx}"
+            )
             disease_class_idx = predicted_disease_idx
-
-            healthy_indices = [idx for idx, name in enumerate(class_names) if _is_healthy_label(name)]
-            if healthy_indices:
-                healthy_prob = sum(float(disease_probs[idx]) for idx in healthy_indices if idx < len(disease_probs))
-                disease_risk = max(0.0, min(100.0, (1.0 - healthy_prob) * 100.0))
-            else:
-                disease_risk = max(0.0, min(100.0, disease_conf * 100.0))
 
     severity_idx = int(torch.tensor(severity_probs).argmax().item())
     severity_name = SEVERITY_LABELS[severity_idx]
     severity_conf = severity_probs[severity_idx]
-
-    disease_class_idx = locals().get('disease_class_idx')
+    risk_tier = risk_tier_from_prediction(
+        severity_idx, float(disease_conf), severity_confidence=float(severity_conf)
+    )
+    risk_tier_brief = risk_tier_short(severity_idx, disease_risk)
     treatment_plan = build_treatment_plan(
         disease_name=disease_name,
         severity=severity_name,
@@ -251,6 +255,8 @@ def predict_image(image, model_path="best_multitask_model.pth", device_name=None
     meta = {
         "device": str(device),
         "disease_risk_percent": round(disease_risk, 2),
+        "risk_tier": risk_tier,
+        "risk_tier_brief": risk_tier_brief,
         "disease_name": treatment_plan["disease_name"],
         "disease_confidence": round(disease_conf, 4),
         "severity": severity_name,
@@ -264,12 +270,12 @@ def predict_image(image, model_path="best_multitask_model.pth", device_name=None
     return annotated, summary, probability_map, meta
 
 
-def predict_with_uncertainty(image, mc_samples=16, model_path="best_multitask_model.pth", device_name=None):
+def predict_with_uncertainty(image, mc_samples=16, model_path="models/best_multitask_model.pth", device_name=None):
     """Run MC Dropout stochastic forward passes to estimate uncertainty.
 
     Returns: annotated (PIL.Image), summary (str), probability_map (dict mean), meta (dict with stds and paths)
     """
-    model_path = model_path or os.environ.get('MODEL_PATH', 'best_multitask_model.pth')
+    model_path = model_path or os.environ.get('MODEL_PATH', 'models/best_multitask_model.pth')
 
     model, device, metadata = load_model(model_path=model_path, device_name=device_name)
     transform = build_transform()

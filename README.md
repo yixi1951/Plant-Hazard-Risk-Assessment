@@ -193,10 +193,12 @@ MobileNetV2 Backbone (预训练特征提取)
 | 严重程度分类 | ~85%+ |
 
 输出产物：
-- `best_multitask_model.pth` / `best_single_disease_model.pth` / `best_single_severity_model.pth`
+- `models/best_multitask_model.pth` / `models/best_single_disease_model.pth` / `models/best_single_severity_model.pth`
+- `models/best_multitask_model.onnx` — ONNX 导出格式
 - `diagnostic_reports/` — 每张图片的详细诊断文本
 - `grad_cam_visualizations/` — 模型关注区域可视化
 - `reports/` — 结构化 JSON + PDF 诊断报告
+- `docs/img/` — 训练曲线、风险分布、协同效应等可视化图片
 
 ---
 

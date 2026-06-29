@@ -1,0 +1,11 @@
+.git
+__pycache__
+*.pyc
+tmp_uploads/*
+reports/*
+*.log
+docs/*.pptx
+data/
+.venv
+venv/
+.cursor

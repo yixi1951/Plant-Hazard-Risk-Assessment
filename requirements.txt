@@ -7,6 +7,10 @@ matplotlib>=3.8.0
 seaborn>=0.13.0
 tqdm>=4.66.0
 opencv-python>=4.9.0
-tensorflow>=2.16.0
 Flask>=3.0.0
 pytest>=8.0.0
+requests>=2.31.0
+gunicorn>=22.0.0
+
+# 可选：ONNX 导出与推理（pip install -r requirements-optional.txt）
+# 可选：Playwright 端到端测试（pip install playwright && playwright install chromium）

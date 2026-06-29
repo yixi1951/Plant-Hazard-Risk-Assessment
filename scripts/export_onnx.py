@@ -2,7 +2,7 @@ import torch
 from scripts.inference_utils import MultiTaskNetwork
 import argparse
 
-def export(model_path='best_multitask_model.pth', out_path='best_multitask_model.onnx'):
+def export(model_path='models/best_multitask_model.pth', out_path='models/best_multitask_model.onnx'):
     device = torch.device('cpu')
     model = MultiTaskNetwork(num_diseases=1, num_severity=3)
     state = torch.load(model_path, map_location=device)
@@ -24,7 +24,7 @@ def export(model_path='best_multitask_model.pth', out_path='best_multitask_model
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', default='best_multitask_model.pth')
-    parser.add_argument('--out', default='best_multitask_model.onnx')
+    parser.add_argument('--model', default='models/best_multitask_model.pth')
+    parser.add_argument('--out', default='models/best_multitask_model.onnx')
     args = parser.parse_args()
     export(args.model, args.out)

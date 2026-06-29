@@ -12,6 +12,7 @@ import glob
 
 from flask import Flask, render_template_string, render_template, request, jsonify
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', os.environ.get('SECRET_KEY', 'dev-change-me-in-production'))
 
 # ── 临时文件自动清理 ──────────────────────────────────────────
 _TMP_DIR = os.path.join(os.getcwd(), 'tmp_uploads')
@@ -141,7 +142,7 @@ def _format_chart_label(time_str, index=0):
     return f'诊断{index + 1}'
 
 # ── 启动模型校验 ──────────────────────────────────────────
-_MODEL_PATH = os.environ.get('MODEL_PATH', 'best_multitask_model.pth')
+_MODEL_PATH = os.environ.get('MODEL_PATH', 'models/best_multitask_model.pth')
 if os.path.exists(_MODEL_PATH):
     try:
         _model, _device, _meta = load_model(model_path=_MODEL_PATH)
@@ -164,11 +165,11 @@ from flask import send_from_directory, url_for
 from PIL import ImageDraw, ImageFont
 
 
-# Max upload size (in bytes). Default 10 MB, can be overridden with env var MAX_UPLOAD_MB
+# Max upload size (in bytes). Default 200 MB, can be overridden with env var MAX_UPLOAD_MB
 try:
-  _max_mb = int(os.environ.get('MAX_UPLOAD_MB', '10'))
+  _max_mb = int(os.environ.get('MAX_UPLOAD_MB', '200'))
 except Exception:
-  _max_mb = 10
+  _max_mb = 200
 app.config['MAX_CONTENT_LENGTH'] = _max_mb * 1024 * 1024
 
 # logging
@@ -282,20 +283,17 @@ def _open_validated_image(data: bytes, source_label: str):
   return image.convert('RGB'), detected_format
 
 def _host_resolves_to_private(hostname: str) -> bool:
-  try:
-    infos = socket.getaddrinfo(hostname, None)
-    for info in infos:
-      addr = info[4][0]
-      try:
-        ip = ipaddress.ip_address(addr)
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
-          return True
-      except Exception:
-        continue
-  except Exception:
-    # if DNS fails, err on the side of safety by denying
-    return True
-  return False
+  from scripts.upload_security import host_resolves_to_private
+  return host_resolves_to_private(hostname)
+
+
+def _decode_upload_bytes(data: bytes):
+  """批量/API 共用：字节 → RGB PIL。"""
+  from scripts.upload_security import open_validated_image, reject_internet_shortcut_prefix
+  if not data:
+    raise ValueError("上传文件为空")
+  reject_internet_shortcut_prefix(data)
+  return open_validated_image(data, "upload")[0]
 
 
 def _index_image_helpers():
@@ -316,7 +314,7 @@ def _index_image_helpers():
             ct = (resp.headers.get('Content-Type') or '').lower()
             if not ct.startswith('image/'):
                 raise ValueError('下载的资源不是图片 (Content-Type 非 image/*)')
-            max_bytes = app.config.get('MAX_CONTENT_LENGTH', 10 * 1024 * 1024)
+            max_bytes = app.config.get('MAX_CONTENT_LENGTH', 200 * 1024 * 1024)
             cl = resp.headers.get("Content-Length")
             if cl and int(cl) > max_bytes:
                 raise ValueError(f"图片太大，最大支持 {max_bytes // (1024 * 1024)}MB")
@@ -331,7 +329,7 @@ def _index_image_helpers():
         if _FILENAME_BAD_RE.search(filename):
             raise ValueError('上传文件名含可疑扩展名，已被拒绝')
         data = file.read()
-        max_bytes = app.config.get('MAX_CONTENT_LENGTH', 10 * 1024 * 1024)
+        max_bytes = app.config.get('MAX_CONTENT_LENGTH', 200 * 1024 * 1024)
         if data and len(data) > max_bytes:
             raise ValueError(f'上传文件过大，最大支持 {max_bytes // (1024 * 1024)}MB')
         if _detect_image_signature(data) is None:
@@ -347,6 +345,54 @@ def _index_image_helpers():
         return _open_validated_image(data, 'upload')[0]
 
     return _bytes_from_source, _decode_bytes_to_image
+
+
+@app.route('/api/predict', methods=['POST'])
+def api_predict():
+    """JSON 诊断：上传图片或 preview_token，返回与 Web 评估一致的 meta（含 risk_tier）。"""
+    _bytes_from_source, _decode_bytes_to_image = _index_image_helpers()
+    file = request.files.get('image')
+    image_url = (request.form.get('image_url') or '').strip()
+    token = (request.form.get('preview_token') or '').strip()
+    if request.is_json and request.json:
+        image_url = str(request.json.get('image_url') or image_url).strip()
+        token = str(request.json.get('preview_token') or token).strip()
+    try:
+        mc_samples = int(request.form.get('mc_samples') or (request.json or {}).get('mc_samples') or 0)
+    except Exception:
+        mc_samples = 0
+    try:
+        if token:
+            tmp_path = os.path.join(os.getcwd(), 'tmp_uploads', token)
+            if not os.path.exists(tmp_path):
+                return jsonify({'ok': False, 'error': '预览已过期，请重新上传'}), 400
+            with open(tmp_path, 'rb') as fh:
+                data = fh.read()
+            image = _decode_bytes_to_image(data)
+        elif file and file.filename:
+            data = _bytes_from_source(file, image_url)
+            image = _decode_bytes_to_image(data)
+        elif image_url:
+            data = _bytes_from_source(None, image_url)
+            image = _decode_bytes_to_image(data)
+        else:
+            return jsonify({'ok': False, 'error': '请上传 image、preview_token 或 image_url'}), 400
+
+        if mc_samples and mc_samples > 1:
+            _, summary, probabilities, meta = predict_with_uncertainty(image, mc_samples=mc_samples)
+        else:
+            _, summary, probabilities, meta = predict_image(image)
+        meta = enrich_meta_from_treatment(meta)
+        return jsonify({
+            'ok': True,
+            'summary': summary,
+            'probabilities': probabilities,
+            'meta': meta,
+            'treatment_plan': meta.get('treatment_plan'),
+        })
+    except Exception as exc:
+        logger.warning('API predict failed: %s', exc)
+        return jsonify({'ok': False, 'error': str(exc)}), 400
 
 
 @app.route('/api/preview', methods=['POST'])
@@ -421,16 +467,16 @@ def index():
         raise ValueError('下载的资源不是图片 (Content-Type 非 image/*)')
 
       cl = resp.headers.get("Content-Length")
-      max_bytes = app.config.get('MAX_CONTENT_LENGTH', 5 * 1024 * 1024)
+      max_bytes = app.config.get('MAX_CONTENT_LENGTH', 200 * 1024 * 1024)
       if cl:
         try:
           if int(cl) > max_bytes:
-            raise ValueError("图片太大，最大支持 5MB")
+            raise ValueError(f"图片太大，最大支持 {max_bytes // (1024 * 1024)}MB")
         except Exception:
           pass
       data = resp.content
       if len(data) > max_bytes:
-        raise ValueError("图片太大，最大支持 5MB")
+        raise ValueError(f"图片太大，最大支持 {max_bytes // (1024 * 1024)}MB")
 
       if _detect_image_signature(data) is None:
         logger.warning('Blocked URL with unknown image signature: %s', image_url)
@@ -445,10 +491,10 @@ def index():
 
       # read content and enforce size limit
       data = file.read()
-      max_bytes = app.config.get('MAX_CONTENT_LENGTH', 5 * 1024 * 1024)
+      max_bytes = app.config.get('MAX_CONTENT_LENGTH', 200 * 1024 * 1024)
       if data and len(data) > max_bytes:
         logger.warning('Blocked upload too large: %s bytes (file=%s)', len(data), filename)
-        raise ValueError('上传文件过大，最大支持 5MB')
+        raise ValueError(f'上传文件过大，最大支持 {max_bytes // (1024 * 1024)}MB')
 
       # simple extension check
       _, ext = os.path.splitext(filename.lower())
@@ -709,7 +755,7 @@ def batch_predict():
     for f in batch_files:
         if f and f.filename:
             data = f.read()
-            if len(data) > app.config.get('MAX_CONTENT_LENGTH', 10 * 1024 * 1024):
+            if len(data) > app.config.get('MAX_CONTENT_LENGTH', 200 * 1024 * 1024):
                 continue  # skip oversized
             if _detect_image_signature(data) is not None:
                 images_to_process.append((f.filename, data))
@@ -751,7 +797,7 @@ def batch_predict():
     results = []
     for fname, img_data in images_to_process:
         try:
-            image = _decode_bytes_to_image(img_data)
+            image = _decode_upload_bytes(img_data)
             annotated, summary, probabilities, meta = predict_image(image)
             meta = enrich_meta_from_treatment(meta)
             tp = meta.get('treatment_plan') or {}
