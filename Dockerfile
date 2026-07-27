@@ -2,6 +2,12 @@
 # 生产版 — 支持 PostgreSQL + REST API + 审计日志 + Excel 导出
 FROM python:3.11-slim-bookworm
 
+# ── 构建时注入版本信息 ──
+ARG COMMIT_SHA
+ARG BUILD_TIME
+ENV COMMIT_SHA=${COMMIT_SHA:-""} \
+    BUILD_TIME=${BUILD_TIME:-""}
+
 WORKDIR /app
 
 # 系统依赖

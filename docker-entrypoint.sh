@@ -52,4 +52,4 @@ exec gunicorn \
     --access-logfile /app/logs/access.log \
     --error-logfile /app/logs/error.log \
     --log-level "${LOG_LEVEL:-INFO}" \
-    "app:app"
+    "wsgi:app"

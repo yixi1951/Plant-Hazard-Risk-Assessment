@@ -1021,6 +1021,43 @@ def download_report(fname):
   return send_from_directory(reports_dir, fname, as_attachment=True)
 
 
+# ═══════════════════════════════════════════════════════════
+# 根级运维端点 (Docker/K8s 探测 + 版本信息)
+# ═══════════════════════════════════════════════════════════
+
+@app.route('/healthz')
+def healthz_liveness():
+    """存活探针 — 纯粹返回 200，不依赖任何外部服务。"""
+    return 'OK', 200
+
+
+@app.route('/readyz')
+def readyz_readiness():
+    """就绪探针 — 检查数据库连接。"""
+    try:
+        from app.models.database import get_db_session
+        from sqlalchemy import text
+        with get_db_session() as session:
+            session.execute(text("SELECT 1"))
+        return jsonify({"status": "healthy", "database": "connected"}), 200
+    except Exception as exc:
+        return jsonify({"status": "unhealthy", "database": str(exc)}), 503
+
+
+@app.route('/version')
+def version_info():
+    """版本信息 — commit SHA、构建时间、Python 版本。"""
+    commit_sha = os.environ.get('COMMIT_SHA', '')
+    build_time = os.environ.get('BUILD_TIME', '')
+    return jsonify({
+        "app": "zhinong",
+        "version": "1.0.0",
+        "commit": commit_sha,
+        "build_time": build_time,
+        "python": sys.version.split()[0],
+    })
+
+
 # ── 生产级扩展：注册 REST API 蓝图 ──────────────────────────
 from app.api import api_bp
 app.register_blueprint(api_bp)

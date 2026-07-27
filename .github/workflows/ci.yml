@@ -77,6 +77,9 @@ jobs:
           tags: zhinong:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            COMMIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ github.event.repository.updated_at }}
 
       - name: Verify image exists
         run: docker image inspect zhinong:ci

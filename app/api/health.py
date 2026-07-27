@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from flask import jsonify
+from sqlalchemy import text
 
 from app.api import api_bp
 
@@ -12,7 +13,7 @@ def healthz():
     try:
         from app.models.database import get_db_session
         with get_db_session() as session:
-            session.execute(session.bind.dialect.statement_compiler(session.bind.dialect, None).__class__.__module__ == '')
+            session.execute(text("SELECT 1"))
     except Exception:
         return jsonify({"status": "unhealthy", "database": "disconnected"}), 503
 

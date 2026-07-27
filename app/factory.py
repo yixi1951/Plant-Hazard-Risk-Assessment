@@ -131,5 +131,7 @@ def _init_database(app: Flask) -> None:
 def _register_blueprints(app: Flask) -> None:
     """注册所有蓝图。"""
     from app.api import api_bp
+    from app.api.root_routes import root_bp
     app.register_blueprint(api_bp)
-    logging.getLogger("zhinong").debug("Blueprints registered: %s", api_bp.name)
+    app.register_blueprint(root_bp)
+    logging.getLogger("zhinong").debug("Blueprints registered: %s, %s", api_bp.name, root_bp.name)
