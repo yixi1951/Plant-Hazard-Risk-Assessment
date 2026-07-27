@@ -48,6 +48,7 @@
     <div class="sidebar-section">
       <div class="sidebar-label">更多</div>
       <a class="sidebar-link" href="/about"><span class="nav-icon"></span>关于项目</a>
+      <a class="sidebar-link" href="#" id="sidebar_login_btn"><span class="nav-icon"></span>登录</a>
       <a class="sidebar-link" href="/faq"><span class="nav-icon"></span>常见问题</a>
       <a class="sidebar-link" href="/team"><span class="nav-icon"></span>团队介绍</a>
       <a class="sidebar-link" href="/api"><span class="nav-icon"></span>API 文档</a>
@@ -482,6 +483,7 @@
         <button type="button" class="btn btn-outline-secondary result-action-btn" onclick="copySummary();"><span class="result-action-icon icon-copy" aria-hidden="true"></span>复制摘要</button>
         <button type="button" class="btn btn-outline-secondary result-action-btn" onclick="shareResult();"><span class="result-action-icon icon-share" aria-hidden="true"></span>分享结果</button>
         <button type="button" class="btn btn-outline-secondary result-action-btn" onclick="downloadReport();"><span class="result-action-icon icon-download" aria-hidden="true"></span>下载 JSON</button>
+        <button type="button" class="btn btn-outline-secondary result-action-btn" onclick="downloadExcel();"><span class="result-action-icon icon-excel" aria-hidden="true"></span>导出 Excel</button>
         <button type="button" class="btn btn-primary result-action-btn" onclick="downloadAnnotated();"><span class="result-action-icon icon-image" aria-hidden="true"></span>下载结果图</button>
       </div>
 
@@ -504,6 +506,10 @@
             {% endfor %}
           </div>
 
+          {% set risk_tier = result.meta.get('risk_tier') or tp.get('risk_tier', '低风险') %}
+          {% set tier_short = '高' if '高' in risk_tier else ('中' if '中' in risk_tier else '低') %}
+          {% set responsible = result.meta.get('responsible_person') or tp.get('responsible_person', '巡检人员') %}
+          {% set deadline = result.meta.get('deadline_days') or tp.get('deadline_days', 7) %}
           <div class="risk-meter-wrap">
             <div class="meter" id="disease_meter" data-percent="{{ '%.0f'|format(result.meta.disease_risk_percent) }}">
               <div class="meter-fill">
@@ -517,6 +523,31 @@
               <div class="result-highlight">严重程度：<strong>{{ result.meta.severity }}</strong></div>
               <div class="result-highlight urgency-{{ tp.get('urgency', '中') }}">紧急程度：<strong>{{ tp.get('urgency', '中') }}</strong></div>
               <div class="result-highlight">作物类型：<strong>{{ tp.get('crop', result.meta.get('crop', '-')) }}</strong></div>
+            </div>
+            <!-- 风险等级徽章 -->
+            <div class="risk-tier-badge">
+              <span class="tier-label tier-{{ tier_short }}" title="{{ risk_tier }}">{{ risk_tier }}</span>
+            </div>
+            <!-- 责任人 + 截止日期 -->
+            <div class="accountability-panel">
+              <div class="accountability-item">
+                <span class="acc-icon icon-person" aria-hidden="true"></span>
+                <div>
+                  <div class="acc-label">责任人</div>
+                  <div class="acc-value">{{ responsible }}</div>
+                </div>
+              </div>
+              <div class="accountability-item">
+                <span class="acc-icon icon-deadline" aria-hidden="true"></span>
+                <div>
+                  <div class="acc-label">处置期限</div>
+                  <div class="acc-value">{{ deadline }} 天内完成</div>
+                </div>
+              </div>
+            </div>
+            {% set risk_tier = result.meta.get('risk_tier_brief') or result.meta.get('risk_tier', '低风险') %}
+            <div class="risk-tier-badge">
+              <span class="tier-label tier-{{ risk_tier[:1] }}">{{ risk_tier }}</span>
             </div>
           </div>
 
@@ -532,6 +563,14 @@
           <div class="actionable-banner result-subsection">
             <h3 class="result-subsection-title">田间执行建议</h3>
             <p class="actionable-text">{{ tp.get('actionable_summary') or tp.get('quick_suggestion') }}</p>
+          </div>
+          {% endif %}
+
+          {% set suggestion_text = result.meta.get('suggestion') or tp.get('suggestion', '') %}
+          {% if suggestion_text %}
+          <div class="sop-banner result-subsection">
+            <h3 class="result-subsection-title">标准处置建议 (SOP)</h3>
+            <p class="sop-text">{{ suggestion_text }}</p>
           </div>
           {% endif %}
 
@@ -582,6 +621,20 @@
                 <dt>周期</dt>
                 <dd>{{ tp.get('treatment_duration', '-') }}</dd>
               </div>
+              {% set resp = result.meta.get('responsible_person') or tp.get('responsible_person', '') %}
+              {% if resp %}
+              <div class="meta-dl-row">
+                <dt>责任人</dt>
+                <dd>{{ resp }}</dd>
+              </div>
+              {% endif %}
+              {% set dd = result.meta.get('deadline_days') or tp.get('deadline_days', '') %}
+              {% if dd %}
+              <div class="meta-dl-row">
+                <dt>处置期限</dt>
+                <dd>{{ dd }} 天</dd>
+              </div>
+              {% endif %}
             </dl>
             {% if result.report_json or result.report_pdf %}
             <div class="report-links">
@@ -734,6 +787,42 @@
           <div class="modal-footer-btns">
             <button class="btn btn-primary btn-3d" type="button" id="detail_modal_action" style="display:none;"></button>
             <button class="btn btn-outline-secondary btn-3d" type="button" id="detail_modal_close2">关闭</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 登录弹窗 Modal ===== -->
+    <div id="login_modal_overlay" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="login_modal_title">
+      <div class="modal-container modal-container-sm">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <h2 id="login_modal_title">登录</h2>
+            <p class="modal-subtitle">使用账号登录以访问完整功能</p>
+          </div>
+          <button type="button" class="modal-close" id="login_modal_close" aria-label="关闭">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div id="login_error_msg" class="alert alert-danger" style="display:none;"></div>
+          <div id="login_success_msg" class="alert alert-success" style="display:none;"></div>
+          <div class="form-group mb-3">
+            <label for="login_username">用户名</label>
+            <input type="text" id="login_username" class="form-control" placeholder="请输入用户名" autocomplete="username">
+          </div>
+          <div class="form-group mb-3">
+            <label for="login_password">密码</label>
+            <input type="password" id="login_password" class="form-control" placeholder="请输入密码" autocomplete="current-password">
+          </div>
+          <div id="login_user_info" style="display:none;">
+            <p class="text-success">已登录：<strong id="login_display_name"></strong> (<span id="login_display_role"></span>)</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <span id="login_status_text" class="modal-footer-meta"></span>
+          <div class="modal-footer-btns">
+            <button class="btn btn-primary btn-3d" type="button" id="login_confirm_btn">登录</button>
+            <button class="btn btn-outline-secondary btn-3d" type="button" id="login_logout_btn" style="display:none;">退出登录</button>
+            <button class="btn btn-outline-secondary btn-3d" type="button" id="login_modal_close2">关闭</button>
           </div>
         </div>
       </div>
@@ -1738,6 +1827,180 @@
       URL.revokeObjectURL(url);
     } catch (e) { console.warn(e); alert('导出报告失败'); }
   };
+
+  // ===== 导出 Excel =====
+  window.downloadExcel = function() {
+    try {
+      const summaryEl = document.querySelector('.summary');
+      const metaData = getMetaText() || {};
+      const probsEls = document.querySelectorAll('.probs .prob');
+      const probs = {};
+      probsEls.forEach(p => {
+        const key = p.querySelector('span') && p.querySelector('span').textContent.trim();
+        const val = p.querySelector('strong') && p.querySelector('strong').textContent.trim();
+        if (key) probs[key] = val;
+      });
+      // 构造发送给后端的数据
+      const payload = {
+        summary: summaryEl ? summaryEl.textContent.trim() : '',
+        disease_risk_percent: metaData.disease_risk_percent || 0,
+        severity: metaData.severity || '',
+        device: metaData.device || '',
+        probabilities: probs,
+        risk_tier: '{{ result.meta.get("risk_tier", "低风险") }}',
+        responsible_person: '{{ result.meta.get("responsible_person", "") }}',
+        deadline_days: '{{ result.meta.get("deadline_days", "") }}'
+      };
+      // 通过 API 获取 Excel 文件
+      fetch('/api/v1/assessments/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function(resp) {
+        if (!resp.ok) { alert('导出失败: ' + resp.statusText); return; }
+        return resp.blob();
+      }).then(function(blob) {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'assessment_report.xlsx';
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+      }).catch(function(e) { console.warn(e); alert('导出失败'); });
+    } catch (e) { console.warn(e); alert('导出失败'); }
+  };
+
+  // ===== 登录逻辑 =====
+  (function() {
+    var loginBtn = document.getElementById('sidebar_login_btn');
+    var overlay = document.getElementById('login_modal_overlay');
+    var closeBtn = document.getElementById('login_modal_close');
+    var closeBtn2 = document.getElementById('login_modal_close2');
+    var loginConfirm = document.getElementById('login_confirm_btn');
+    var logoutBtn = document.getElementById('login_logout_btn');
+    var usernameInput = document.getElementById('login_username');
+    var passwordInput = document.getElementById('login_password');
+    var errorMsg = document.getElementById('login_error_msg');
+    var successMsg = document.getElementById('login_success_msg');
+    var loginUserInfo = document.getElementById('login_user_info');
+    var loginDisplayName = document.getElementById('login_display_name');
+    var loginDisplayRole = document.getElementById('login_display_role');
+    var loginStatusText = document.getElementById('login_status_text');
+
+    function getToken() { try { return localStorage.getItem('zhinong_token'); } catch(e) { return null; } }
+    function setToken(t) { try { localStorage.setItem('zhinong_token', t); } catch(e) {} }
+    function removeToken() { try { localStorage.removeItem('zhinong_token'); } catch(e) {} }
+
+    function showLoginError(msg) {
+      if (errorMsg) { errorMsg.textContent = msg; errorMsg.style.display = 'block'; }
+      if (successMsg) successMsg.style.display = 'none';
+    }
+    function showLoginSuccess(msg) {
+      if (successMsg) { successMsg.textContent = msg; successMsg.style.display = 'block'; }
+      if (errorMsg) errorMsg.style.display = 'none';
+    }
+    function hideLoginMessages() {
+      if (errorMsg) errorMsg.style.display = 'none';
+      if (successMsg) successMsg.style.display = 'none';
+    }
+
+    function updateLoginUI() {
+      var token = getToken();
+      if (token && loginDisplayName && loginDisplayRole) {
+        try {
+          var parts = token.split('.');
+          if (parts.length === 3) {
+            var payload = JSON.parse(atob(parts[1]));
+            loginDisplayName.textContent = payload.sub || payload.username || '用户';
+            loginDisplayRole.textContent = payload.role || '未知';
+            if (loginConfirm) loginConfirm.style.display = 'none';
+            if (usernameInput) usernameInput.style.display = 'none';
+            if (passwordInput) passwordInput.style.display = 'none';
+            if (logoutBtn) logoutBtn.style.display = 'inline-block';
+            if (loginUserInfo) loginUserInfo.style.display = 'block';
+            if (loginStatusText) loginStatusText.textContent = '已登录';
+            hideLoginMessages();
+            return;
+          }
+        } catch(e) {}
+      }
+      // 未登录
+      if (loginConfirm) loginConfirm.style.display = 'inline-block';
+      if (usernameInput) usernameInput.style.display = 'block';
+      if (passwordInput) passwordInput.style.display = 'block';
+      if (logoutBtn) logoutBtn.style.display = 'none';
+      if (loginUserInfo) loginUserInfo.style.display = 'none';
+      if (loginStatusText) loginStatusText.textContent = '未登录';
+      hideLoginMessages();
+    }
+
+    function openLoginModal() {
+      if (!overlay) return;
+      overlay.style.display = 'flex';
+      overlay.classList.add('is-open');
+      document.body.classList.add('modal-open');
+      updateLoginUI();
+    }
+
+    function closeLoginModal() {
+      if (overlay) {
+        overlay.style.display = 'none';
+        overlay.classList.remove('is-open');
+      }
+      document.body.classList.remove('modal-open');
+    }
+
+    if (loginBtn) loginBtn.addEventListener('click', function(e) { e.preventDefault(); openLoginModal(); });
+    if (closeBtn) closeBtn.addEventListener('click', closeLoginModal);
+    if (closeBtn2) closeBtn2.addEventListener('click', closeLoginModal);
+
+    if (loginConfirm) {
+      loginConfirm.addEventListener('click', function() {
+        var uname = usernameInput ? usernameInput.value.trim() : '';
+        var pwd = passwordInput ? passwordInput.value.trim() : '';
+        if (!uname || !pwd) { showLoginError('请输入用户名和密码'); return; }
+        loginConfirm.disabled = true;
+        loginConfirm.textContent = '登录中...';
+        fetch('/api/v1/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: uname, password: pwd })
+        }).then(function(r) { return r.json().then(function(d) { return { status: r.status, body: d }; }); })
+        .then(function(resp) {
+          if (resp.status === 200 && resp.body.access_token) {
+            setToken(resp.body.access_token);
+            showLoginSuccess('登录成功！');
+            updateLoginUI();
+          } else {
+            showLoginError(resp.body.detail || resp.body.message || '登录失败');
+          }
+        }).catch(function(e) {
+          showLoginError('网络错误: ' + (e.message || '未知'));
+        }).finally(function() {
+          loginConfirm.disabled = false;
+          loginConfirm.textContent = '登录';
+        });
+      });
+    }
+
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', function() {
+        removeToken();
+        updateLoginUI();
+        showLoginSuccess('已退出登录');
+      });
+    }
+
+    // 点击遮罩层关闭
+    if (overlay) {
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeLoginModal();
+      });
+    }
+
+    // 检查已有 token
+    updateLoginUI();
+  })();
 
   // ===== Tag Strip Navigation =====
   document.querySelectorAll('.tag-item[data-target]').forEach(tag => {

@@ -1006,7 +1006,43 @@ def download_report(fname):
   reports_dir = os.path.join(os.getcwd(), 'reports')
   if not os.path.exists(os.path.join(reports_dir, fname)):
     return ('Not found', 404)
+  # 审计日志
+  try:
+    from app.services.audit_service import log_action
+    log_action(
+        action="download_report",
+        resource_type="report",
+        resource_id=fname,
+        ip_address=request.remote_addr,
+        detail={"report_file": fname},
+    )
+  except Exception:
+    pass
   return send_from_directory(reports_dir, fname, as_attachment=True)
+
+
+# ── 生产级扩展：注册 REST API 蓝图 ──────────────────────────
+from app.api import api_bp
+app.register_blueprint(api_bp)
+
+# ── 数据库初始化 ──────────────────────────────────────────
+try:
+    from app.models.database import init_db
+    init_db()
+    logging.getLogger(__name__).info("✅ Database tables initialized")
+except Exception as exc:
+    logging.getLogger(__name__).warning("Database init: %s", exc)
+
+# ── 管理员初始账号 ──────────────────────────────────────
+try:
+    from app.services.auth_service import init_admin_user
+    init_admin_user()
+except Exception as exc:
+    logging.getLogger(__name__).warning("Admin init: %s", exc)
+
+# ── 确保目录 ──────────────────────────────────────────
+os.makedirs(os.path.join(os.getcwd(), 'reports'), exist_ok=True)
+os.makedirs(os.path.join(os.getcwd(), 'tmp_uploads'), exist_ok=True)
 
 
 if __name__ == "__main__":

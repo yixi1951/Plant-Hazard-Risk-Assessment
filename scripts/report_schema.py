@@ -60,4 +60,24 @@ def enrich_meta_from_treatment(meta: dict) -> dict:
         meta["urgency"] = tp["urgency"]
     if not meta.get("disease_name") and tp.get("disease_name"):
         meta["disease_name"] = tp["disease_name"]
+
+    # 风险等级 → 责任人 / 截止天数 / 建议措施
+    risk_tier = meta.get("risk_tier") or tp.get("risk_tier", "")
+    if not meta.get("responsible_person"):
+        if "高" in risk_tier:
+            meta["responsible_person"] = "植保站技术员"
+        elif "中" in risk_tier:
+            meta["responsible_person"] = "田间管理人员"
+        else:
+            meta["responsible_person"] = "巡检人员"
+    if not meta.get("deadline_days"):
+        if "高" in risk_tier:
+            meta["deadline_days"] = 1
+        elif "中" in risk_tier:
+            meta["deadline_days"] = 3
+        else:
+            meta["deadline_days"] = 7
+
+    if not meta.get("suggestion") and tp.get("suggestion"):
+        meta["suggestion"] = tp["suggestion"]
     return meta

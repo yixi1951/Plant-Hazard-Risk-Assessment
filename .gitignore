@@ -9,6 +9,7 @@ env/
 
 # Generated data and outputs
 .kaggle/
+data/
 .tmp_*
 data/raw/
 data/mock_problem_b/
@@ -49,3 +50,8 @@ Thumbs.db
 # Temp
 %TEMP%/
 ~$*
+
+# Environment files
+.env
+.env.local
+

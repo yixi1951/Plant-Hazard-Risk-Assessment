@@ -4,17 +4,75 @@
 >
 > 基于多任务深度学习，同时输出病害类别、严重程度分级与风险评分，并提供完整的 Web 演示界面与诊断报告。
 
+[![CI](https://github.com/your-org/zhinong/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/zhinong/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
+![Flask](https://img.shields.io/badge/Flask-3.0%2B-lightgrey)
+![License](https://img.shields.io/badge/License-MIT-green)
+
+---
+
+## 目录
+
+- [项目概述](#项目概述)
+- [快速部署](#快速部署docker-compose-推荐)
+- [快速开始（本地开发）](#快速开始)
+- [使用流程](#使用流程)
+- [项目结构](#项目结构)
+- [模型架构](#模型架构)
+- [API 文档](#api-文档)
+- [实验结果](#实验结果)
+
 ---
 
 ## 项目概述
 
-本项目是一个端到端的农作物病害智能诊断系统，涵盖从数据准备、模型训练到 Web 部署的完整流程。
-
 **核心能力：**
 - **多任务联合学习** — 单模型同时预测病害种类（61 类）、严重程度（3 级）和风险评分
 - **可解释诊断** — 支持 Grad-CAM 热力图可视化与结构化诊断报告
+- **风险分级预警** — 自动分三级（高/中/低），指派责任人并生成 SOP 标准处置建议
+- **生产级后端** — PostgreSQL + JWT 鉴权 + RBAC 角色控制 + 审计日志 + Excel 报告导出
 - **Web 交互界面** — 浅色简洁仪表盘，支持本地图片上传、URL 抓取、拖拽上传与批量预测
-- **灵活部署** — Flask 后端，默认监听 `0.0.0.0:7860`，局域网内即可访问
+- **灵活部署** — Flask 后端，支持 Docker Compose 一键部署、Nginx 反向代理
+
+---
+
+## 快速部署（Docker Compose 推荐）
+
+### 前置条件
+
+- Docker Engine 24+ 和 Docker Compose v2+
+- 模型权重文件 `models/best_multitask_model.pth`（无模型时仅演示模式可用）
+
+### 一键部署
+
+```bash
+# 1. 克隆仓库
+git clone https://github.com/your-org/zhinong.git
+cd zhinong
+
+# 2. 配置环境变量
+cp .env.example .env
+# 编辑 .env，至少修改 FLASK_SECRET_KEY、JWT_SECRET、ADMIN_PASSWORD
+
+# 3. 启动所有服务
+docker compose up -d
+
+# 4. 验证
+curl http://localhost:7860/healthz
+```
+
+访问 `http://localhost:7860` 即可使用。
+
+### 详细部署说明
+
+参见 [docs/DEPLOY.md](docs/DEPLOY.md) 包含：
+- 手动部署步骤
+- 环境变量完整参考
+- PostgreSQL 配置与备份
+- Nginx 反向代理 + HTTPS 配置
+- 安全加固清单
+- 监控与日志
+- 常见故障排除
 
 ---
 
@@ -108,11 +166,71 @@ Web 界面也可直接点击 **「客户演示样例」** 卡片查看完整识�
 
 ---
 
+## API 文档
+
+系统提供两套 API：
+
+### 传统 API（`app.py` 内置）
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/predict` | POST | 图片诊断（文件/URL/预览 token） |
+| `/api/preview` | POST | 图片预览 |
+| `/batch_predict` | POST | 批量预测 |
+| `/api/diseases` | GET | 病害目录 |
+| `/api/dashboard_stats` | GET | 仪表盘统计数据 |
+| `/reports/<fname>` | GET | 下载诊断报告 |
+
+### REST API v1（`/api/v1/`）
+
+| 端点 | 方法 | 鉴权 | 说明 |
+|------|------|------|------|
+| `/api/v1/healthz` | GET | 否 | 健康检查 |
+| `/api/v1/auth/login` | POST | 否 | 用户登录，返回 JWT |
+| `/api/v1/auth/register` | POST | 否 | 用户注册 |
+| `/api/v1/auth/me` | GET | 是 | 当前用户信息 |
+| `/api/v1/assessments` | POST | 否 | 提交风险评估 |
+| `/api/v1/assessments/<id>` | GET | 否 | 查询评估详情 |
+| `/api/v1/assessments` | GET | 否 | 评估历史列表 |
+| `/api/v1/assessments/export` | POST | 否 | 导出 Excel 报告 |
+| `/api/v1/risk-rules` | GET | 否 | 风险规则列表 |
+
+详细 API 文档见 Web 界面 `/api` 页面。
+
+---
+
 ## 项目结构
 
 ```
 .
-├── app.py                              # Flask Web 主程序
+├── app.py                              # Flask Web 主程序（传统路由）
+├── app/                                # 生产级应用包
+│   ├── __init__.py
+│   ├── config.py                       # 统一配置管理（env → .env → 默认值）
+│   ├── factory.py                      # Flask 应用工厂
+│   ├── middleware.py                    # 请求 ID、结构化日志、安全头
+│   ├── api/                            # REST API v1 蓝图
+│   │   ├── __init__.py
+│   │   ├── auth.py                     # 登录/注册/用户信息
+│   │   ├── assessments.py              # 评估 CRUD + Excel 导出
+│   │   ├── risk_rules.py               # 风险规则查询
+│   │   └── health.py                   # 健康检查
+│   ├── models/                         # SQLAlchemy ORM
+│   │   ├── __init__.py
+│   │   ├── database.py                 # 引擎与会话工厂
+│   │   ├── user.py                     # 用户模型 (admin/assessor/readonly)
+│   │   ├── assessment.py               # 评估记录模型
+│   │   ├── risk_rule.py                # 风险规则 + 版本历史
+│   │   ├── hazard_record.py            # 灾害记录模型
+│   │   └── audit_log.py               # 审计日志模型
+│   └── services/                       # 业务逻辑层
+│       ├── __init__.py
+│       ├── auth_service.py             # JWT 认证 + RBAC
+│       ├── risk_service.py             # 风险评分 + SOP 生成
+│       ├── risk_rules_config.py        # 三级风险规则 + SOP 模板
+│       ├── audit_service.py            # 审计日志写入/查询
+│       └── report_service.py           # Excel 报告导出
+│
 ├── train_multitask_model.py            # 多任务联合训练入口
 ├── train_single_disease.py             # 单病害分类器训练
 ├── train_severity_gradcam.py           # 严重程度三分类 + GradCAM
@@ -121,8 +239,10 @@ Web 界面也可直接点击 **「客户演示样例」** 卡片查看完整识�
 ├── plot_training_curves.py             # 训练曲线可视化
 │
 ├── scripts/
-│   ├── utils.py                        # 共享工具函数（病害字典、数据查找、标注解析）
+│   ├── utils.py                        # 共享工具函数
 │   ├── inference_utils.py              # 模型加载与推理引擎
+│   ├── risk_score.py                   # 统一风险评分函数
+│   ├── report_schema.py                # 诊断报告规范
 │   ├── train_disease_multitask.py      # 带病害名称输出的多任务训练
 │   ├── batch_infer.py                  # 批量推理脚本
 │   ├── generate_mock_dataset.py        # 模拟数据集生成
@@ -135,25 +255,40 @@ Web 界面也可直接点击 **「客户演示样例」** 卡片查看完整识�
 │   └── __init__.py
 │
 ├── templates/                          # Jinja2 页面模板
-│   ├── index.html                      # 主界面（暗色仪表盘 + ECharts）
-│   ├── base.html                       # 基础布局
-│   ├── about.html / team.html / faq.html / api.html
+│   ├── index.html                      # 主界面（仪表盘 + ECharts）
+│   ├── base.html                       # 基础布局骨架
+│   └── about.html / team.html / faq.html / api.html
 │
-├── static/
-│   ├── css/main.css                    # 全局样式（浅色简洁主题）
-│   ├── js/main.js                      # 前端交互逻辑
-│   └── favicon.svg
+├── static/                             # 静态资源
+│   ├── css/main.css                    # 全局样式
+│   ├── js/main.js                      # 前端交互
+│   └── vendor/                         # 第三方库 (echarts, bootstrap)
+│
+├── migrations/
+│   └── 001_initial_schema.sql          # PostgreSQL 初始建表 + 种子数据
+│
+├── tests/
+│   ├── test_risk_service.py            # 风险服务 17 个单元测试
+│   ├── test_api_flask.py               # API 集成测试
+│   ├── test_upload_security.py         # 上传安全测试
+│   └── ...
+│
+├── docker-compose.yml                  # Docker Compose (PostgreSQL + App)
+├── Dockerfile                          # 生产镜像
+├── docker-entrypoint.sh                # 容器入口（DB 迁移 + Gunicorn）
+├── .dockerignore
+├── .env.example                        # 环境变量模板
+├── .github/workflows/ci.yml           # GitHub Actions CI
+├── setup.cfg                           # pytest + flake8 配置
 │
 ├── data/                               # 数据集
-│   ├── mock_problem_b/                 # 模拟验证数据
-│   ├── plantvillage/                   # PlantVillage 数据
-│   └── raw/                            # 原始数据
+├── reports/                            # 诊断报告输出
+├── models/                             # 模型权重
+├── logs/                               # Gunicorn 日志
+├── tmp_uploads/                        # 临时上传文件
 │
-├── reports/                            # 诊断报告输出目录
-├── diagnostic_reports/                 # 详细诊断文本报告
-├── grad_cam_visualizations/            # Grad-CAM 热力图
-│
-├── requirements.txt
+├── requirements.txt                    # 生产依赖
+├── requirements-optional.txt           # 可选依赖
 ├── .gitignore
 └── README.md
 ```

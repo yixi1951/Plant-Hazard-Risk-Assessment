@@ -1,13 +1,47 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: zhinong
+      POSTGRES_USER: zhinong
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zhinong_pass}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zhinong"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
   zhinong:
     build: .
     ports:
-      - "7860:7860"
+      - "${APP_PORT:-7860}:7860"
+    env_file:
+      - .env
     environment:
       FLASK_SECRET_KEY: ${FLASK_SECRET_KEY:-dev-compose-secret}
-      MAX_UPLOAD_MB: "200"
-      MODEL_PATH: /app/models/best_multitask_model.pth
+      DATABASE_URL: postgresql://zhinong:${POSTGRES_PASSWORD:-zhinong_pass}@db:5432/zhinong
+      JWT_SECRET: ${JWT_SECRET:-dev-compose-jwt-secret}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@zhinong.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin123!}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
+      # 模型文件（只读，宿主机需存在）
       - ./models/best_multitask_model.pth:/app/models/best_multitask_model.pth:ro
+      # 持久化数据
       - ./reports:/app/reports
+      - ./logs:/app/logs
+      - ./data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  pgdata:

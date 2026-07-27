@@ -88,4 +88,70 @@
 <section class="content-panel callout-panel">
   <p>更多说明见项目 <code>README.md</code>「仪表盘与数据可视化」「模型架构」章节。</p>
 </section>
+
+<!-- ── REST API v1 ── -->
+<section class="content-panel">
+  <h2 class="panel-heading">RESTful API v1（生产接口）</h2>
+  <p class="panel-text">前缀 <code>/api/v1</code>，支持 JSON 请求/响应，JWT Bearer Token 鉴权（部分端点）。</p>
+
+  <h3 class="panel-subheading">鉴权</h3>
+  <table class="api-table">
+    <thead><tr><th>方法</th><th>路径</th><th>鉴权</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>POST</code></td><td><code>/api/v1/auth/login</code></td><td>否</td><td>登录，返回 <code>access_token</code></td></tr>
+      <tr><td><code>POST</code></td><td><code>/api/v1/auth/register</code></td><td>否</td><td>注册新用户</td></tr>
+      <tr><td><code>GET</code></td><td><code>/api/v1/auth/me</code></td><td>是</td><td>当前用户信息</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="panel-subheading">登录请求</h3>
+  <pre class="code-block"><code>curl -X POST http://localhost:7860/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "Admin123!"}'</code></pre>
+  <p class="panel-text">响应：<code>{"access_token": "eyJ...", "token_type": "bearer"}</code></p>
+
+  <h3 class="panel-subheading">评估</h3>
+  <table class="api-table">
+    <thead><tr><th>方法</th><th>路径</th><th>鉴权</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>POST</code></td><td><code>/api/v1/assessments</code></td><td>否</td><td>提交风险评估（含疾病/严重度/置信度）</td></tr>
+      <tr><td><code>GET</code></td><td><code>/api/v1/assessments/&lt;id&gt;</code></td><td>否</td><td>查询单条评估详情</td></tr>
+      <tr><td><code>GET</code></td><td><code>/api/v1/assessments</code></td><td>否</td><td>分页查询评估历史（<code>?page=1&per_page=20&risk_tier=高</code>）</td></tr>
+      <tr><td><code>POST</code></td><td><code>/api/v1/assessments/export</code></td><td>否</td><td>导出评估报告为 Excel（<code>.xlsx</code>）</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="panel-subheading">风险规则 &amp; 审计</h3>
+  <table class="api-table">
+    <thead><tr><th>方法</th><th>路径</th><th>鉴权</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET</code></td><td><code>/api/v1/risk-rules</code></td><td>否</td><td>当前所有风险规则</td></tr>
+      <tr><td><code>GET</code></td><td><code>/api/v1/audit-logs</code></td><td>是</td><td>审计日志列表（需 admin 角色）</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="panel-subheading">健康检查</h3>
+  <pre class="code-block"><code>curl http://localhost:7860/api/v1/healthz
+# {"status":"ok","database":"connected","timestamp":"..."}</code></pre>
+
+  <h3 class="panel-subheading">提交评估示例</h3>
+  <pre class="code-block"><code>curl -X POST http://localhost:7860/api/v1/assessments \
+  -H "Content-Type: application/json" \
+  -d '{
+    "disease_name": "玉米大斑病",
+    "severity": "严重",
+    "severity_idx": 2,
+    "disease_confidence": 0.92,
+    "severity_confidence": 0.85,
+    "risk_percent": 82.5,
+    "crop": "玉米",
+    "is_healthy": false
+  }'</code></pre>
+
+  <h3 class="panel-subheading">导出 Excel</h3>
+  <pre class="code-block"><code>curl -X POST http://localhost:7860/api/v1/assessments/export \
+  -H "Content-Type: application/json" \
+  -d '{"summary":"...","disease_risk_percent":82.5,"severity":"严重"}' \
+  -o report.xlsx</code></pre>
+</section>
 {% endblock %}

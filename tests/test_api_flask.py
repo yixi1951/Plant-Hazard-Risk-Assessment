@@ -10,13 +10,19 @@ import pytest
 
 pytest.importorskip("flask")
 
-from app import app as flask_app
+import importlib.util
 
 
 @pytest.fixture
 def client():
-    flask_app.config["TESTING"] = True
-    with flask_app.test_client() as c:
+    # app.py 和 app/ 包同名，使用 importlib 显式加载文件
+    spec = importlib.util.spec_from_file_location(
+        "app_module", os.path.join(ROOT, "app.py")
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod.app.config["TESTING"] = True
+    with mod.app.test_client() as c:
         yield c
 
 
